@@ -3,6 +3,8 @@
 namespace App\Jobs;
 
 use App\DTO\AuvoTaskDTO;
+use App\Enums\AuvoDepartment;
+use App\Models\AuvoTask;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -11,6 +13,7 @@ use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use App\Models\Task;
+use Illuminate\Http\Client\RequestException;
 
 class UpdateAuvoTaskJob implements ShouldQueue
 {
@@ -19,24 +22,50 @@ class UpdateAuvoTaskJob implements ShouldQueue
     public function __construct(
         protected readonly string $accessToken,
         protected readonly AuvoTaskDTO $auvoTaskDTO,
+        protected readonly AuvoDepartment $auvoDepartment,
     ) {}
 
     public function handle(): void
     {
         $client = $this->configureHttpClient();
 
+        // try {
+
+        //     $externalId = $this->auvoTaskDTO->externalId;
+
+        //     $response = $client->get("tasks/?paramFilter=%7B'externalId':'$externalId','startDate':'2024-01-01T00:00:00','endDate':'2024-12-31T00:00:00'%7D&page=1&pageSize=1&order=asc");
+        // } catch (RequestException $e) {
+        //     Log::error("RequestException: {$e->getMessage()}");
         try {
-            Log::info("Creating task for customer " . json_encode($this->auvoTaskDTO->toArray()));
+            // if ($e->getCode() != 404) {
+            //     return;
+            // }
             $response = $client->put('tasks/', $this->auvoTaskDTO->toArray());
 
-            Log::info("Creating task for customer {$this->auvoTaskDTO->taskDate}: {$response->body()}");
-
             if (!in_array($response->status(), [200, 201])) {
-                Log::error("Error creating task for customer {$this->auvoTaskDTO->externalId}: {$response->body()}");
+                Log::error("Error updating task " . json_encode($this->auvoTaskDTO) . "; Message: {$response->body()}");
             }
+
+            $this->auvoTaskDTO->taskId = $response->json()['result']['taskID'] ?? $response->json()['result'][0]['taskID'];
+
+            AuvoTask::updateOrCreate(
+                [
+                    'task_id' => $this->auvoTaskDTO->taskId,
+                    'auvo_department' => $this->auvoDepartment,
+                ],
+                [
+                    'task_id' => $this->auvoTaskDTO->taskId,
+                    'external_id' => $this->auvoTaskDTO->externalId,
+                    'auvo_customer_id' => $this->auvoTaskDTO->auvoCostumerId,
+                ]
+            );
         } catch (\Exception $e) {
-            Log::error("Exception creating task for customer {$this->auvoTaskDTO->externalId}: " . $e->getMessage());
+            dd($e);
+            Log::error("Exception: {$e->getMessage()}");
         }
+        // } catch (\Exception $e) {
+        //     Log::error("Exception: {$e->getMessage()}");
+        // }
     }
 
     private function configureHttpClient()

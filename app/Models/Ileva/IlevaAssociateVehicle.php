@@ -44,18 +44,19 @@ class IlevaAssociateVehicle extends Model
         try {
             return DB::connection('ileva')
                 ->select("
-            SELECT DISTINCT hav.id,
-			CONCAT(hap.cpf, '-', hav.placa) external_id,
+                SELECT DISTINCT hav.id,
+			CONCAT(hap.cpf, hav.placa) external_id,
             CONCAT(hav.id, ' / ', hap.nome, ' / ', hav.placa, ' / ', IF(habv.id_beneficio IN (118,122,130,174,234), 'PROTEC', 'LOCALIZO'), ' / ', has.nome) `name`,
             CONCAT(IFNULL(hap.logradouro, ''), ' ', IFNULL(hap.numero, ''), ', ', IFNULL(hap.bairro, ''), ' - ', IFNULL(hmuc.cidade, ''), ' ', IFNULL(hmus.uf, '')) address,
-			DATE_FORMAT(hav.dt_contrato, '%d/%m/%y') `description`,
+				CONCAT(DATE_FORMAT(hav.create_at, '%d/%m/%y'), ' - ', IFNULL(haf.modelo, '')) `description`,
             IFNULL(hap.tel_celular, '00000000000') phone_number,
-            CONCAT(DATE_FORMAT(hav.dt_contrato, '%Y-%m-%d'), 'T01:01') task_date,
+            DATE_FORMAT(hav.create_at, '%Y-%m-%dT%H:%i') task_date,
             CASE
             	WHEN has.id IN (1, 5) THEN 'instalação'
 					WHEN has.id = 4 THEN 'troca_titularidade'
 					ELSE 'remoção'
 				END task_type,
+            hap.cpf,
             IF(habv.id_beneficio IN (118,122,130,174,234), 'protec', 'localizo') team
             FROM hbrd_asc_veiculo hav
             INNER JOIN hbrd_asc_beneficio_veiculo habv on hav.id = habv.id_veiculo
@@ -67,8 +68,9 @@ class IlevaAssociateVehicle extends Model
             LEFT JOIN hbrd_main_util_state hmus ON hmus.id = hmuc.id_estado
             INNER JOIN hbrd_asc_situacao has ON hav.id_situacao = has.id
             LEFT JOIN hbrd_adm_plan_item hapi ON hav.id_plan_item = hapi.id
+            LEFT JOIN hbrd_adm_fipe haf ON hav.codigo_fipe = haf.codigofipe
             WHERE hab.id IN (118, 122, 130, 174, 234, 181, 123, 119, 31)
-            AND has.id IN (1, 4, 5, 7, 8, 9, 16)
+            AND has.id IN (1, 3, 4, 5, 7, 8, 9, 10, 16)
             AND hapi.id_plan IN (209, 211, 212, 213, 214, 216, 217, 218, 219, 220, 222, 223, 224, 225, 227, 228, 229, 232, 237, 238, 240, 241, 243, 244)
             AND YEAR(hav.dt_contrato) >= 2024;
             ");

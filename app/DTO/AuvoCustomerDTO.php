@@ -2,17 +2,19 @@
 
 namespace App\DTO;
 
+use App\Enums\AuvoDepartment;
+
 final class AuvoCustomerDTO
 {
     public function __construct(
         public readonly string $externalId,
-        public readonly string $description,
-        public readonly string $name,
-        public readonly string $address,
-        public readonly string $manager = 'thais santos',
-        public readonly string $note,
-        public readonly bool $active = true,
-        public readonly ?int $workshopId = null,
+        public readonly ?string $description,
+        public readonly ?string $name,
+        public readonly ?string $address,
+        public readonly ?string $manager = 'thais santos',
+        public readonly ?string $note,
+        public readonly ?bool $active = true,
+        public ?string $customerId = null,
         public readonly ?string $cpfCnpj = null,
         public readonly ?string $email = null,
         public readonly ?array $phoneNumber = null,
@@ -32,12 +34,21 @@ final class AuvoCustomerDTO
             'manager' => $this->manager,
             'note' => $this->note,
             'active' => $this->active,
-            'workshopId' => $this->workshopId,
             'cpfCnpj' => $this->cpfCnpj,
             'email' => $this->email,
             'phoneNumber' => $this->phoneNumber,
             'orientation' => $this->orientation,
             'groupsId' => $this->groupsId,
+        ];
+    }
+
+    public function toArrayDB(AuvoDepartment $auvoDepartment): array
+    {
+        return [
+            'auvo_department' => $auvoDepartment,
+            'external_id' => $this->externalId,
+            'customer_id' => $this->customerId,
+            'name' => $this->name,
         ];
     }
 }

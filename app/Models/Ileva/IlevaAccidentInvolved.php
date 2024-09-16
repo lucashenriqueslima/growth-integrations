@@ -2,6 +2,7 @@
 
 namespace App\Models\Ileva;
 
+use Illuminate\Support\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Database\Eloquent\Model;
@@ -13,29 +14,23 @@ class IlevaAccidentInvolved extends Model
     protected $connection = 'ileva';
     protected $table = 'hbrd_adm_sinister_participant';
     protected $guarded = [];
-    public static function getAccidentInvolvedForAuvoToSolidy(string $databaseConnection): array
+
+    public static function getAccidentInvolvedForAuvoToSolidy(): array
     {
-        return DB::connection($databaseConnection)
+        return DB::connection('ileva')
             ->select("
               SELECT DISTINCT
-    par.id,
+    par.id external_id,
     CONCAT(par.id, ' / ', par.nome, ' / ', par.placa) AS `name`,
     status.id_pai,
     tipe.id_participant,
-    (
-        SELECT haso_inner.id
-        FROM hbrd_adm_sinister_order haso_inner
-        WHERE haso_inner.id_participant = par.id
-          AND (haso_inner.id_tipo = 1 OR haso_inner.id_tipo = 13)
-        ORDER BY FIELD(haso_inner.id_tipo, 1, 13)
-        LIMIT 1
-    ) AS id_order,
+    status.create_at start_date,
     DATE_FORMAT(status.create_at, '%d/%m/%y') AS dataContrato,
     CONCAT(DATE_FORMAT(status.create_at, '%d/%m/%y'), ' ', DATEDIFF(NOW(), status.create_at), ' dia(s)') AS note,
     par.nome,
     par.placa,
     par.cpf_cnpj AS cpfCnpj,
-    has.id AS id_oficina,
+    has.id AS workshop_id,
     CONCAT(IFNULL(has.nome, ''), ' / ', IFNULL(has.endereco, ''), ' / ', IFNULL(city.cidade, ''), ' - ', IFNULL(state.uf, '')) AS address,
     CONCAT(IFNULL(has.nome, ''), ' / Placa: ', IFNULL(par.placa, ''), ' / Veículo: ', IFNULL(par.modelo_veiculo, '')) AS orientation,
     par.telefone AS phone,
@@ -61,50 +56,8 @@ class IlevaAccidentInvolved extends Model
     status.leave_at,
     s.nome,
     city.cidade AS cidade_associado,
-    state.uf AS estado_associado,
-    (
-        SELECT JSON_ARRAYAGG(
-            JSON_OBJECT(
-                'quantidade', oi.quantidade,
-                'descricao', oi.descricao,
-                'valor', oi.valor,
-                'desconto', oi.desconto,
-                'observacao', oi.observacao,
-                'troca', oi.troca,
-                'lanternagem', oi.lanternagemn,
-                'pintura', oi.pintura
-            )
-        )
-        FROM hbrd_adm_sinister_order_item oi
-        WHERE oi.id_order = (
-            SELECT haso_inner.id
-            FROM hbrd_adm_sinister_order haso_inner
-            WHERE haso_inner.id_participant = par.id
-              AND (haso_inner.id_tipo = 1 OR haso_inner.id_tipo = 13)
-            ORDER BY FIELD(haso_inner.id_tipo, 1, 13)
-            LIMIT 1
-        )
-    ) AS order_items,
-    (
-        SELECT JSON_OBJECT(
-            'valor_maoobra', haso.valor_maoobra,
-            'valor_desconto', haso.valor_desconto,
-            'valor_desconto_itens', haso.valor_desconto_itens,
-            'valor_desconto_negociacao', haso.valor_desconto_negociacao,
-            'subtotal', haso.subtotal,
-            'valor_total', haso.valor_total,
-            'ajuda_participativa', haso.ajuda_participativa
-        )
-        FROM hbrd_adm_sinister_order haso
-        WHERE haso.id = (
-            SELECT haso_inner.id
-            FROM hbrd_adm_sinister_order haso_inner
-            WHERE haso_inner.id_participant = par.id
-              AND (haso_inner.id_tipo = 1 OR haso_inner.id_tipo = 13)
-            ORDER BY FIELD(haso_inner.id_tipo, 1, 13)
-            LIMIT 1
-        )
-    ) AS order_summary
+    state.uf AS estado_associado
+
 FROM hbrd_adm_sinister_participant_status_history status
 LEFT JOIN hbrd_adm_sinister_participant_type_history tipe ON status.id_pai = tipe.id
 LEFT JOIN hbrd_adm_sinister_status s ON status.id_status = s.id
@@ -132,14 +85,13 @@ GROUP BY tipe.id_participant;
         ");
     }
 
-    public static function getAccidentInvolvedForAuvoToMotoclub(string $databaseConnection): array
+    public static function getAccidentInvolvedForAuvoToMotoclub(): array
     {
-        return DB::connection($databaseConnection)
+        return DB::connection('ileva_motoclub')
             ->select("
               SELECT DISTINCT
-    par.id,
-    CONCAT(par.id, ' / ', par.nome, ' / ', par.placa) AS `name`,
-    status.id_pai,
+    CONCAT ('mc', par.id) external_id,
+    CONCAT('mc', par.id, ' / ', par.nome, ' / ', par.placa) AS `name`,
     tipe.id_participant,
     (
         SELECT haso_inner.id
@@ -154,7 +106,7 @@ GROUP BY tipe.id_participant;
     par.nome,
     par.placa,
     par.cpf_cnpj AS cpfCnpj,
-    has.id AS id_oficina,
+    has.id AS workshop_id,
     CONCAT(IFNULL(has.nome, ''), ' / ', IFNULL(has.endereco, ''), ' / ', IFNULL(city.cidade, ''), ' - ', IFNULL(state.uf, '')) AS address,
     CONCAT(IFNULL(has.nome, ''), ' / Placa: ', IFNULL(par.placa, ''), ' / Veículo: ', IFNULL(par.modelo_veiculo, '')) AS orientation,
     par.telefone AS phone,
@@ -180,50 +132,7 @@ GROUP BY tipe.id_participant;
     status.leave_at,
     s.nome,
     city.cidade AS cidade_associado,
-    state.uf AS estado_associado,
-    (
-        SELECT JSON_ARRAYAGG(
-            JSON_OBJECT(
-                'quantidade', oi.quantidade,
-                'descricao', oi.descricao,
-                'valor', oi.valor,
-                'desconto', oi.desconto,
-                'observacao', oi.observacao,
-                'troca', oi.troca,
-                'lanternagem', oi.lanternagemn,
-                'pintura', oi.pintura
-            )
-        )
-        FROM hbrd_adm_sinister_order_item oi
-        WHERE oi.id_order = (
-            SELECT haso_inner.id
-            FROM hbrd_adm_sinister_order haso_inner
-            WHERE haso_inner.id_participant = par.id
-              AND (haso_inner.id_tipo = 1 OR haso_inner.id_tipo = 13)
-            ORDER BY FIELD(haso_inner.id_tipo, 1, 13)
-            LIMIT 1
-        )
-    ) AS order_items,
-    (
-        SELECT JSON_OBJECT(
-            'valor_maoobra', haso.valor_maoobra,
-            'valor_desconto', haso.valor_desconto,
-            'valor_desconto_itens', haso.valor_desconto_itens,
-            'valor_desconto_negociacao', haso.valor_desconto_negociacao,
-            'subtotal', haso.subtotal,
-            'valor_total', haso.valor_total,
-            'ajuda_participativa', haso.ajuda_participativa
-        )
-        FROM hbrd_adm_sinister_order haso
-        WHERE haso.id = (
-            SELECT haso_inner.id
-            FROM hbrd_adm_sinister_order haso_inner
-            WHERE haso_inner.id_participant = par.id
-              AND (haso_inner.id_tipo = 1 OR haso_inner.id_tipo = 13)
-            ORDER BY FIELD(haso_inner.id_tipo, 1, 13)
-            LIMIT 1
-        )
-    ) AS order_summary
+    state.uf AS estado_associado
 FROM hbrd_adm_sinister_participant_status_history status
 LEFT JOIN hbrd_adm_sinister_participant_type_history tipe ON status.id_pai = tipe.id
 LEFT JOIN hbrd_adm_sinister_status s ON status.id_status = s.id
@@ -251,29 +160,21 @@ GROUP BY tipe.id_participant;
         ");
     }
 
-    public static function getAccidentInvolvedForAuvoToNova(string $databaseConnection): array
+    public static function getAccidentInvolvedForAuvoToNova(): array
     {
-        return DB::connection($databaseConnection)
+        return DB::connection('ileva_nova')
             ->select("
             SELECT DISTINCT
-    par.id,
-    CONCAT(par.id, ' / ', par.nome, ' / ', par.placa) AS `name`,
+    CONCAT('nv', par.id) external_id,
+    CONCAT('nv', par.id, ' / ', par.nome, ' / ', par.placa) AS `name`,
     status.id_pai,
     tipe.id_participant,
-    (
-        SELECT haso_inner.id
-        FROM hbrd_adm_sinister_order haso_inner
-        WHERE haso_inner.id_participant = par.id
-          AND (haso_inner.id_tipo = 1 OR haso_inner.id_tipo = 13)
-        ORDER BY FIELD(haso_inner.id_tipo, 1, 13)
-        LIMIT 1
-    ) AS id_order,
     DATE_FORMAT(status.create_at, '%d/%m/%y') AS dataContrato,
     CONCAT(DATE_FORMAT(status.create_at, '%d/%m/%y'), ' ', DATEDIFF(NOW(), status.create_at), ' dia(s)') AS note,
     par.nome,
     par.placa,
     par.cpf_cnpj AS cpfCnpj,
-    has.id AS id_oficina,
+    has.id AS workshop_id,
     CONCAT(IFNULL(has.nome, ''), ' / ', IFNULL(has.endereco, ''), ' / ', IFNULL(city.cidade, ''), ' - ', IFNULL(state.uf, '')) AS address,
     CONCAT(IFNULL(has.nome, ''), ' / Placa: ', IFNULL(par.placa, ''), ' / Veículo: ', IFNULL(par.modelo_veiculo, '')) AS orientation,
     par.telefone AS phone,
@@ -299,50 +200,7 @@ GROUP BY tipe.id_participant;
     status.leave_at,
     s.nome,
     city.cidade AS cidade_associado,
-    state.uf AS estado_associado,
-    (
-        SELECT JSON_ARRAYAGG(
-            JSON_OBJECT(
-                'quantidade', oi.quantidade,
-                'descricao', oi.descricao,
-                'valor', oi.valor,
-                'desconto', oi.desconto,
-                'observacao', oi.observacao,
-                'troca', oi.troca,
-                'lanternagem', oi.lanternagemn,
-                'pintura', oi.pintura
-            )
-        )
-        FROM hbrd_adm_sinister_order_item oi
-        WHERE oi.id_order = (
-            SELECT haso_inner.id
-            FROM hbrd_adm_sinister_order haso_inner
-            WHERE haso_inner.id_participant = par.id
-              AND (haso_inner.id_tipo = 1 OR haso_inner.id_tipo = 13)
-            ORDER BY FIELD(haso_inner.id_tipo, 1, 13)
-            LIMIT 1
-        )
-    ) AS order_items,
-    (
-        SELECT JSON_OBJECT(
-            'valor_maoobra', haso.valor_maoobra,
-            'valor_desconto', haso.valor_desconto,
-            'valor_desconto_itens', haso.valor_desconto_itens,
-            'valor_desconto_negociacao', haso.valor_desconto_negociacao,
-            'subtotal', haso.subtotal,
-            'valor_total', haso.valor_total,
-            'ajuda_participativa', haso.ajuda_participativa
-        )
-        FROM hbrd_adm_sinister_order haso
-        WHERE haso.id = (
-            SELECT haso_inner.id
-            FROM hbrd_adm_sinister_order haso_inner
-            WHERE haso_inner.id_participant = par.id
-              AND (haso_inner.id_tipo = 1 OR haso_inner.id_tipo = 13)
-            ORDER BY FIELD(haso_inner.id_tipo, 1, 13)
-            LIMIT 1
-        )
-    ) AS order_summary
+    state.uf AS estado_associado
 FROM hbrd_adm_sinister_participant_status_history status
 LEFT JOIN hbrd_adm_sinister_participant_type_history tipe ON status.id_pai = tipe.id
 LEFT JOIN hbrd_adm_sinister_status s ON status.id_status = s.id
@@ -370,11 +228,12 @@ GROUP BY tipe.id_participant;
         ");
     }
 
-    public static function getAccidentInvolvedForAuvoExpertiseInSolidy(): array
+    public static function getAccidentInvolvedForAuvoExpertiseInSolidy(): Collection
     {
         try {
-            return DB::connection('ileva')
-                ->select("
+            return collect(
+                DB::connection('ileva')
+                    ->select("
 SELECT DISTINCT
 CONCAT('so_', par.id) external_id,
 CONCAT('so_', par.id) note,
@@ -412,20 +271,22 @@ WHERE status.id_status = 17
         ),
         status.leave_at
     ) IS NULL
-	AND DATE(status.create_at) > '2024-08-28'
+	AND DATE(status.create_at) >= '2024-09-03'
 
 GROUP BY tipe.id_participant;
-            ");
+            ")
+            );
         } catch (\Exception $e) {
-            return [];
+            return collect([]);
         }
     }
 
-    public static function getAccidentInvolvedForAuvoExpertiseInMotoclub(): array
+    public static function getAccidentInvolvedForAuvoExpertiseInMotoclub(): Collection
     {
         try {
-            return DB::connection('ileva_motoclub')
-                ->select("
+            return collect(
+                DB::connection('ileva_motoclub')
+                    ->select("
 SELECT DISTINCT
 CONCAT('mc_', par.id) external_id,
 CONCAT('mc_', par.id) note,
@@ -463,12 +324,13 @@ WHERE status.id_status = 16
         ),
         status.leave_at
     ) IS NULL
-   AND DATE(status.create_at) > '2024-08-28'
+   AND DATE(status.create_at) >= '2024-09-03'
 
 GROUP BY tipe.id_participant;
-    ");
+    ")
+            );
         } catch (\Exception $e) {
-            return [];
+            return collect([]);
         }
     }
 }

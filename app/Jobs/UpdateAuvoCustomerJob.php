@@ -4,7 +4,9 @@ namespace App\Jobs;
 
 use App\DTO\AuvoCustomerDTO;
 use App\DTO\AuvoTaskDTO;
+use App\Enums\AuvoDepartment;
 use App\Helpers\ValidationHelper;
+use App\Models\AuvoCustomer;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -24,7 +26,8 @@ class UpdateAuvoCustomerJob implements ShouldQueue
     public function __construct(
         protected readonly string $accessToken,
         protected readonly AuvoCustomerDTO $auvoCustomerDTO,
-        protected readonly ?AuvoTaskDTO $auvoTaskDTO = null,
+        protected AuvoTaskDTO $auvoTaskDTO,
+        protected readonly AuvoDepartment $auvoDepartment,
     ) {}
 
     /**
@@ -49,15 +52,26 @@ class UpdateAuvoCustomerJob implements ShouldQueue
                 return;
             }
 
-            if (!$this->auvoTaskDTO) {
-                return;
-            }
-
+            $this->auvoCustomerDTO->customerId = $response->json()['result']['id'];
             $this->auvoTaskDTO->customerId = $response->json()['result']['id'];
+
+            $customer = AuvoCustomer::updateOrCreate(
+                [
+                    'auvo_department' => $this->auvoDepartment,
+                    'customer_id' => $this->auvoCustomerDTO->customerId,
+                ],
+                [
+                    'external_id' => $this->auvoCustomerDTO->externalId,
+                    'name' => $this->auvoCustomerDTO->name,
+                ]
+            );
+
+            $this->auvoTaskDTO->auvoCostumerId = $customer->id;
 
             dispatch(new UpdateAuvoTaskJob(
                 $this->accessToken,
                 $this->auvoTaskDTO,
+                $this->auvoDepartment,
             ));
         } catch (\Exception $e) {
             Log::error($e->getMessage());

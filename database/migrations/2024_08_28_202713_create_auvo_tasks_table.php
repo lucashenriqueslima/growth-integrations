@@ -14,9 +14,9 @@ return new class extends Migration
         Schema::create('auvo_tasks', function (Blueprint $table) {
             $table->id();
             $table->foreignId('auvo_customer_id')->constrained('auvo_customers');
+            $table->enum('auvo_department', ['expertise', 'inspection', 'tracking']);
             $table->string('external_id');
             $table->string('task_id');
-            $table->json('data');
             $table->timestamps();
         });
     }

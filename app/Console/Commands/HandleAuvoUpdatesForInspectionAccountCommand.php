@@ -2,81 +2,106 @@
 
 namespace App\Console\Commands;
 
+use App\Domains\AuvoAccountDataEnvironment;
 use App\DTO\AuvoCustomerDTO;
+use App\DTO\AuvoTaskDTO;
+use App\Enums\AuvoDepartment;
+use App\Jobs\Inspection\SendRequestToCreateAuvoInspectionCustomer;
+use App\Models\Ileva\IlevaAccidentInvolved;
 use App\Services\Auvo\AuvoAuthService;
 use App\Services\Auvo\AuvoData;
 use Illuminate\Console\Command;
 use App\Services\Auvo\AuvoService;
+use App\Services\GrowthApi\GrowthApiService;
+use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\Cache;
 use Laravel\Octane\Facades\Octane;
 
 class HandleAuvoUpdatesForInspectionAccountCommand extends Command
 {
-    protected $signature = 'auvo-customer-update';
+    protected $signature = 'auvo:inspection-update';
     protected $description = 'Auvo customer update';
+    protected AuvoAccountDataEnvironment $auvoAccountDataEnvironment;
 
     public function handle()
     {
-        $accessTokenForAuvoAPI = (new AuvoAuthService(
-            env('AUVO_API_KEY_INSPECTION'),
-            env('AUVO_API_TOKEN_INSPECTION')
-        ))->getAccessToken();
-
-        $auvoService = new AuvoService($accessTokenForAuvoAPI);
-        [$solidyCustomers, $motoclubCustomers, $novaCustomers] = $auvoService->getIlevaDatabaseCustomersForInspectionAuvoAccount();
-        // $auvoService->updateCustomers($solidyCustomers);
-        // $auvoService->updateCustomers($motoclubCustomers, 'mc');
-
-        $tasksData = (new AuvoData())->getAuvoData();
-
-        foreach ($solidyCustomers as $customer) {
-            $auvoService->dispatchUpdateJobs(
-                new AuvoCustomerDTO(
-                    externalId: $customer->id,
-                    description: $customer->name,
-                    name: "{$customer->id}{$customer->name}",
-                    address: $customer->address,
-                    manager: 'thais santos',
-                    note: $customer->note,
-                    workshopId: $customer->id_oficina,
-                ),
+        try {
+            $this->auvoAccountDataEnvironment = new AuvoAccountDataEnvironment(
+                apiKey: config('auvo_api.inspection.api_key'),
+                apiToken: config('auvo_api.inspection.api_token'),
+                manager: 'thais santos',
+                idUserFrom: 163489,
             );
+
+            $workshops = (new GrowthApiService())->getWorkshops();
+
+            [$solidyCustomers, $motoclubCustomers, $novaCustomers] = Octane::concurrently([
+                fn() => IlevaAccidentInvolved::getAccidentInvolvedForAuvoToSolidy(),
+                fn() => IlevaAccidentInvolved::getAccidentInvolvedForAuvoToMotoclub(),
+                fn() => IlevaAccidentInvolved::getAccidentInvolvedForAuvoToNova(),
+            ], 50000);
+
+            foreach ($solidyCustomers as $solidyCustomer) {
+
+
+                $workshop = Arr::first($workshops, fn($workshop) => $workshop['ileva_id'] === $solidyCustomer->workshop_id);
+
+                dispatch(
+                    new SendRequestToCreateAuvoInspectionCustomer(
+                        AuvoDepartment::Inspection,
+                        new AuvoCustomerDTO(
+                            externalId: $solidyCustomer->external_id,
+                            description: $solidyCustomer->name,
+                            name: $solidyCustomer->name,
+                            address: $solidyCustomer->address,
+                            note: $solidyCustomer->note,
+                            manager: $this->auvoAccountDataEnvironment->manager,
+                        ),
+                        new AuvoTaskDTO(
+                            externalId: $solidyCustomer->external_id,
+                            address: $solidyCustomer->address,
+                            idUserFrom: $this->auvoAccountDataEnvironment->idUserFrom,
+                            idUserTo: $workshop['collaborator']['auvo_id'] ?? null,
+                            orientation: $solidyCustomer->orientation,
+                        ),
+                        $solidyCustomer->start_date,
+                        $workshop,
+
+                    )
+                );
+            }
+        } catch (\Exception $e) {
+            dd($e);
         }
 
-        foreach ($motoclubCustomers as $customer) {
-            $auvoService->dispatchUpdateJobs(
-                new AuvoCustomerDTO(
-                    externalId: "mc{$customer->id}",
-                    description: $customer->name,
-                    name: "{$customer->id}{$customer->name}",
-                    address: $customer->address,
-                    manager: 'thais santos',
-                    note: $customer->note,
-                    workshopId: $customer->id_oficina,
-                ),
-            );
-        }
 
-        foreach ($novaCustomers as $customer) {
-            $auvoService->dispatchUpdateJobs(
-                new AuvoCustomerDTO(
-                    externalId: "nv{$customer->id}",
-                    description: $customer->name,
-                    name: "{$customer->id}{$customer->name}",
-                    address: $customer->address,
-                    manager: 'thais santos',
-                    note: $customer->note,
-                    workshopId: $customer->id_oficina,
-                ),
-            );
-        }
+        // foreach ($solidyCustomers as $solidyCustomer) {
 
-        $this->info('Auvo customers updated successfully.');
-        $this->logExecution();
+
+        //     dd($workshop);
+
+        //     dispatch(new SendRequestToCreateAuvoInspectionCustomer(
+        //         new AuvoCustomerDTO(
+        //             externalId: $solidyCustomer->external_id,
+        //             description: $solidyCustomer->name,
+        //             name: $solidyCustomer->name,
+        //             address: $solidyCustomer->address,
+        //             note: $solidyCustomer->note,
+        //             workshopId: $workshops->firstWhere('name', 'Solidy')->id,
+        //         ),
+        //         new AuvoTaskDTO(
+        //             externalId: $solidyCustomer->external_id,
+        //         ),
+        //         $solidyCustomer->workshop_id,
+        //     ),);
+        // }
     }
 
-    protected function logExecution()
-    {
-        $timestamp = now()->toDateTimeString();
-        $this->info("Command 'auvo-customer-update' was executed at {$timestamp}");
-    }
+
+    // protected function getCollaboratorByWorkshopId(int $workshopId): string
+    // {
+    //     $workshop = $this->auvoAccountDataEnvironment->workshops->firstWhere('id', $workshopId);
+    //     return $workshop->collaborator;
+    // }
 }

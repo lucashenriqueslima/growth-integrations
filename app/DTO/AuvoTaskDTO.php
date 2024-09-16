@@ -2,6 +2,8 @@
 
 namespace App\DTO;
 
+use App\Enums\AuvoDepartment;
+
 final class AuvoTaskDTO
 {
 
@@ -9,11 +11,13 @@ final class AuvoTaskDTO
     const LONGITUDE = -46.688081;
 
     public function __construct(
-        public int $idUserFrom,
-        public string $address,
-        public string $orientation,
-        public int $priority = 3,
-        public ?string $externalId = null,
+        public string $externalId,
+        public ?int $idUserFrom = null,
+        public ?string $address = null,
+        public ?string $orientation = null,
+        public ?int $auvoCostumerId = null,
+        public ?int $taskId = null,
+        public ?int $priority = 3,
         public ?int $idUserTo = null,
         public ?int $teamId = null,
         public ?string $taskDate = null,
@@ -48,6 +52,21 @@ final class AuvoTaskDTO
                     'taskType' => $this->taskType,
                     'customerExternalId' => $this->externalId,
                     'checkInType' => 1,
+                ],
+                fn($value) => $value !== null
+            );
+    }
+
+    //to array to DB insert
+    public function toArrayDB(AuvoDepartment $auvoDepartment): array
+    {
+        return
+            array_filter(
+                [
+                    'auvo_department' => $auvoDepartment,
+                    'external_id' => $this->externalId,
+                    'task_id' => $this->taskId,
+                    'auvo_customer_id' => $this->auvoCostumerId,
                 ],
                 fn($value) => $value !== null
             );
