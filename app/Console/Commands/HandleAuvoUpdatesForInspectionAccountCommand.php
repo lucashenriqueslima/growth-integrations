@@ -34,6 +34,8 @@ class HandleAuvoUpdatesForInspectionAccountCommand extends Command
                 idUserFrom: 163489,
             );
 
+
+
             $workshops = (new GrowthApiService())->getWorkshops();
 
             [$solidyCustomers, $motoclubCustomers, $novaCustomers] = Octane::concurrently([
@@ -41,6 +43,15 @@ class HandleAuvoUpdatesForInspectionAccountCommand extends Command
                 fn() => IlevaAccidentInvolved::getAccidentInvolvedForAuvoToMotoclub(),
                 fn() => IlevaAccidentInvolved::getAccidentInvolvedForAuvoToNova(),
             ], 50000);
+
+            $auvoAccessToken = (new AuvoAuthService(
+                $this->auvoAccountDataEnvironment->apiKey,
+                $this->auvoAccountDataEnvironment->apiToken,
+            ))->getAccessToken();
+
+            $auvoDepartment = AuvoDepartment::Inspection;
+
+            Cache::put("auvo_access_token_{$auvoDepartment->value}", $auvoAccessToken);
 
             foreach ($solidyCustomers as $solidyCustomer) {
 
@@ -64,6 +75,68 @@ class HandleAuvoUpdatesForInspectionAccountCommand extends Command
                             idUserFrom: $this->auvoAccountDataEnvironment->idUserFrom,
                             idUserTo: $workshop['collaborator']['auvo_id'] ?? null,
                             orientation: $solidyCustomer->orientation,
+                            questionnaireId: 173499,
+                        ),
+                        $solidyCustomer->start_date,
+                        $workshop,
+                    )
+                );
+            }
+
+            foreach ($motoclubCustomers as $motoclubCustomer) {
+
+
+                $workshop = Arr::first($workshops, fn($workshop) => $workshop['ileva_id'] === $motoclubCustomer->workshop_id);
+
+                dispatch(
+                    new SendRequestToCreateAuvoInspectionCustomer(
+                        AuvoDepartment::Inspection,
+                        new AuvoCustomerDTO(
+                            externalId: $motoclubCustomer->external_id,
+                            description: $motoclubCustomer->name,
+                            name: $motoclubCustomer->name,
+                            address: $motoclubCustomer->address,
+                            note: $motoclubCustomer->note,
+                            manager: $this->auvoAccountDataEnvironment->manager,
+                        ),
+                        new AuvoTaskDTO(
+                            externalId: $motoclubCustomer->external_id,
+                            address: $motoclubCustomer->address,
+                            idUserFrom: $this->auvoAccountDataEnvironment->idUserFrom,
+                            idUserTo: $workshop['collaborator']['auvo_id'] ?? null,
+                            orientation: $motoclubCustomer->orientation,
+                            questionnaireId: 173499
+                        ),
+                        $solidyCustomer->start_date,
+                        $workshop,
+
+                    )
+                );
+            }
+
+            foreach ($novaCustomers as $novaCustomer) {
+
+
+                $workshop = Arr::first($workshops, fn($workshop) => $workshop['ileva_id'] === $novaCustomer->workshop_id);
+
+                dispatch(
+                    new SendRequestToCreateAuvoInspectionCustomer(
+                        AuvoDepartment::Inspection,
+                        new AuvoCustomerDTO(
+                            externalId: $novaCustomer->external_id,
+                            description: $novaCustomer->name,
+                            name: $novaCustomer->name,
+                            address: $novaCustomer->address,
+                            note: $novaCustomer->note,
+                            manager: $this->auvoAccountDataEnvironment->manager,
+                        ),
+                        new AuvoTaskDTO(
+                            externalId: $novaCustomer->external_id,
+                            address: $novaCustomer->address,
+                            idUserFrom: $this->auvoAccountDataEnvironment->idUserFrom,
+                            idUserTo: $workshop['collaborator']['auvo_id'] ?? null,
+                            orientation: $novaCustomer->orientation,
+                            questionnaireId: 173499
                         ),
                         $solidyCustomer->start_date,
                         $workshop,

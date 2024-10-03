@@ -14,6 +14,7 @@ use App\Enums\AuvoTrackingTaskType;
 use App\Enums\AuvoTrackingTeam;
 use App\Helpers\FormatHelper;
 use App\Jobs\SendRequestToCreateOrUpdateAuvoCustomerJob;
+use App\Jobs\Tracking\SendRequestToCreateAuvoTrackingCustomerJob;
 use App\Services\Auvo\AuvoAuthService;
 use Illuminate\Support\Facades\Bus;
 use App\Services\Auvo\AuvoService;
@@ -52,78 +53,79 @@ class HandleAuvoUpdatesForTrackingAccountCommand extends Command
             idUserFrom: 170464,
         );
 
-        $accessTokenForAuvoAPI = (
+        $auvoAccessToken = (
             new AuvoAuthService(
                 $this->auvoAccountDataEnvironment->apiKey,
                 $this->auvoAccountDataEnvironment->apiToken,
             )
         )->getAccessToken();
 
+        $auvoDepartment = AuvoDepartment::Tracking;
+
+        Cache::put("auvo_access_token_{$auvoDepartment->value}", $auvoAccessToken);
 
 
-        $customers = AuvoService::getIlevaDatabaseCustomersForTrackingAuvoAccount();
+        [$solidyCustomers, $motoclubCustomers] = AuvoService::getIlevaDatabaseCustomersForTrackingAuvoAccount();
 
-        Cache::put('auvo_access_token', $accessTokenForAuvoAPI);
 
-        $auvoService = new AuvoService(
-            auvoDepartment: AuvoDepartment::Tracking,
-            accessToken: $accessTokenForAuvoAPI,
-        );
 
-        // foreach ($customers as $customer) {
-        //     Bus::chain([
-        //         new SendRequestToCreateOrUpdateAuvoCustomerJob(
-        //             auvoDepartment: AuvoDepartment::Tracking,
-        //             auvoCustomerDTO: new AuvoCustomerDTO(
-        //                 externalId: $customer->external_id,
-        //                 description: $customer->description,
-        //                 name: $customer->name,
-        //                 address: $customer->address,
-        //                 manager: $this->auvoAccountDataEnvironment->manager,
-        //                 note: $customer->description,
-        //                 groupsId: [AuvoTrackingCustomerGroup::getCustomerGroupByName($customer->team)],
-        //                 phoneNumber: [FormatHelper::phone((string) $customer->phone_number)],
-        //             ),
-        //             auvoTaskDTO: new AuvoTaskDTO(
-        //                 externalId: $customer->external_id,
-        //                 idUserFrom: $this->auvoAccountDataEnvironment->idUserFrom,
-        //                 idUserTo: AuvoTrackingIdUserTo::getIdUserToByName($customer->team),
-        //                 orientation: AuvoTrackingOrientation::getOrientationByName($customer->task_type),
-        //                 address: $customer->address,
-        //                 // teamId: AuvoTrackingTeam::getTeamByName($customer->team),
-        //                 keyWords: [135995],
-        //                 taskDate: AuvoTrackingTaskType::getTaskTypeByName($customer->task_type) == AuvoTrackingTaskType::Install ? $customer->task_date : null,
-        //                 taskType: AuvoTrackingTaskType::getTaskTypeByName($customer->task_type)->value,
-        //             ),
-        //             isToCreateAuvoTask: true,
-        //         )
-        //     ])->dispatch();
-        // }
+        foreach ($solidyCustomers as $customer) {
 
-        foreach ($customers as $customer) {
-            $auvoService->dispatchUpdateJobs(
-                auvoCustomerDTO: new AuvoCustomerDTO(
-                    externalId: $customer->external_id,
-                    description: $customer->description,
-                    name: $customer->name,
-                    address: $customer->address,
-                    manager: $this->auvoAccountDataEnvironment->manager,
-                    note: $customer->description,
-                    groupsId: [AuvoTrackingCustomerGroup::getCustomerGroupByName($customer->team)],
-                    phoneNumber: [FormatHelper::phone((string) $customer->phone_number)],
-                    cpfCnpj: $customer->cpf,
-                ),
-                auvoTaskDTO: new AuvoTaskDTO(
-                    externalId: $customer->external_id,
-                    idUserFrom: $this->auvoAccountDataEnvironment->idUserFrom,
-                    idUserTo: AuvoTrackingIdUserTo::getIdUserToByName($customer->team),
-                    orientation: AuvoTrackingOrientation::getOrientationByName($customer->task_type),
-                    address: $customer->address,
-                    // teamId: AuvoTrackingTeam::getTeamByName($customer->team),
-                    keyWords: [135995],
-                    taskDate: AuvoTrackingTaskType::getTaskTypeByName($customer->task_type) == AuvoTrackingTaskType::Install ? $customer->task_date : null,
-                    taskType: AuvoTrackingTaskType::getTaskTypeByName($customer->task_type)->value,
-                ),
+            dispatch(
+                new SendRequestToCreateAuvoTrackingCustomerJob(
+                    auvoDepartment: $auvoDepartment,
+                    auvoCustomerDTO: new AuvoCustomerDTO(
+                        externalId: $customer->external_id,
+                        description: $customer->description,
+                        name: $customer->name,
+                        address: $customer->address,
+                        manager: $this->auvoAccountDataEnvironment->manager,
+                        note: $customer->description,
+                        groupsId: [AuvoTrackingCustomerGroup::getCustomerGroupByName($customer->team)],
+                        phoneNumber: [FormatHelper::phone((string) $customer->phone_number)],
+                        cpfCnpj: $customer->cpf,
+                    ),
+                    auvoTaskDTO: new AuvoTaskDTO(
+                        externalId: $customer->external_id,
+                        idUserFrom: $this->auvoAccountDataEnvironment->idUserFrom,
+                        idUserTo: AuvoTrackingIdUserTo::getIdUserToByName($customer->team),
+                        orientation: AuvoTrackingOrientation::getOrientationByName($customer->task_type),
+                        address: $customer->address,
+                        keyWords: [135995],
+                        taskDate: AuvoTrackingTaskType::getTaskTypeByName($customer->task_type) == AuvoTrackingTaskType::Install ? $customer->task_date : null,
+                        taskType: AuvoTrackingTaskType::getTaskTypeByName($customer->task_type)->value,
+                    ),
+                )
+            );
+        }
+
+        foreach ($motoclubCustomers as $customer) {
+
+            dispatch(
+                new SendRequestToCreateAuvoTrackingCustomerJob(
+                    auvoDepartment: $auvoDepartment,
+                    auvoCustomerDTO: new AuvoCustomerDTO(
+                        externalId: $customer->external_id,
+                        description: $customer->description,
+                        name: $customer->name,
+                        address: $customer->address,
+                        manager: $this->auvoAccountDataEnvironment->manager,
+                        note: $customer->description,
+                        groupsId: [124048],
+                        phoneNumber: [FormatHelper::phone((string) $customer->phone_number)],
+                        cpfCnpj: $customer->cpf,
+                    ),
+                    auvoTaskDTO: new AuvoTaskDTO(
+                        externalId: $customer->external_id,
+                        idUserFrom: $this->auvoAccountDataEnvironment->idUserFrom,
+                        idUserTo: 170468,
+                        orientation: AuvoTrackingOrientation::getOrientationByName($customer->task_type),
+                        address: $customer->address,
+                        keyWords: [135995],
+                        taskDate: AuvoTrackingTaskType::getTaskTypeByName($customer->task_type) == AuvoTrackingTaskType::Install ? $customer->task_date : null,
+                        taskType: AuvoTrackingTaskType::getTaskTypeByName($customer->task_type)->value,
+                    ),
+                )
             );
         }
     }

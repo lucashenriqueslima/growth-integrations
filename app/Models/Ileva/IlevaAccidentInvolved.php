@@ -212,7 +212,7 @@ LEFT JOIN hbrd_main_util_city city ON city.id = par.id_cidade
 LEFT JOIN hbrd_main_util_state state ON state.id = par.id_estado
 WHERE status.id_status = 6
   AND par.status = 'Ativo'
-  AND tipe.id_tipo IN ('8', '14')
+  AND tipe.id_tipo IN ('8', '13')
   AND COALESCE(
         (
             SELECT MIN(status_history.create_at)
@@ -235,8 +235,8 @@ GROUP BY tipe.id_participant;
                 DB::connection('ileva')
                     ->select("
 SELECT DISTINCT
-CONCAT('so_', par.id) external_id,
-CONCAT('so_', par.id) note,
+CONCAT('so', par.id) external_id,
+CONCAT('so', par.id) note,
 CONCAT('so_', par.placa) name,
 'solidy' customer_group,
 CASE
@@ -271,7 +271,7 @@ WHERE status.id_status = 17
         ),
         status.leave_at
     ) IS NULL
-	AND DATE(status.create_at) >= '2024-09-03'
+	AND DATE(status.create_at) >= '2024-10-01'
 
 GROUP BY tipe.id_participant;
             ")
@@ -288,8 +288,8 @@ GROUP BY tipe.id_participant;
                 DB::connection('ileva_motoclub')
                     ->select("
 SELECT DISTINCT
-CONCAT('mc_', par.id) external_id,
-CONCAT('mc_', par.id) note,
+CONCAT('mc', par.id) external_id,
+CONCAT('mc', par.id) note,
 CONCAT('mc_', par.placa) name,
 'motoclub' customer_group,
 CASE
@@ -324,7 +324,7 @@ WHERE status.id_status = 16
         ),
         status.leave_at
     ) IS NULL
-   AND DATE(status.create_at) >= '2024-09-03'
+   AND DATE(status.create_at) >= '2024-10-01'
 
 GROUP BY tipe.id_participant;
     ")

@@ -53,7 +53,10 @@ class AuvoService
 
     public static function getIlevaDatabaseCustomersForTrackingAuvoAccount(): array
     {
-        return IlevaAssociateVehicle::getVehiclesForAuvoTrackingInSolidy();
+        return Octane::concurrently([
+            fn() => IlevaAssociateVehicle::getVehiclesForAuvoTrackingInSolidy(),
+            fn() => IlevaAssociateVehicle::getVehiclesForAuvoTrackingInMotoclub(),
+        ], 50000);
     }
 
     public function dispatchUpdateJobs(

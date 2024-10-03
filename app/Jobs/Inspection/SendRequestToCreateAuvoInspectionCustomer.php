@@ -6,6 +6,7 @@ use App\DTO\AuvoCustomerDTO;
 use App\DTO\AuvoTaskDTO;
 use App\Enums\AuvoDepartment;
 use App\Models\AuvoCustomer;
+use App\Models\AuvoTask;
 use App\Traits\AuvoIntegration;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -60,9 +61,20 @@ class SendRequestToCreateAuvoInspectionCustomer implements ShouldQueue
 
             $specificDays->each(function ($specificDay) use (&$tasks) {
 
+                $sufixDate = $specificDay->format('Ymd');
+
+                if (
+                    AuvoTask::where('external_id', "{$this->auvoCustomerDTO->externalId}{$sufixDate}")
+                    ->where('auvo_department', $this->auvoDepartment->value)
+                    ->exists()
+                ) {
+                    return;
+                }
+
                 $this->auvoTaskDTO->taskDate = $specificDay->format('Y-m-d\TH:i:s');
 
-                $this->auvoTaskDTO->externalId = "{$this->auvoCustomerDTO->externalId}{$specificDay->format('Ymd')}";
+                $this->auvoTaskDTO->externalId = "{$this->auvoCustomerDTO->externalId}{$sufixDate}";
+
 
                 dispatch(
                     new SendRequestToCreateAuvoInspectionTask(
@@ -82,13 +94,13 @@ class SendRequestToCreateAuvoInspectionCustomer implements ShouldQueue
         $start = Carbon::parse($startDate)->setTimeFromTimeString("{$visitTime}:01");
         $end = $start->copy()->addDays(60);
 
-        $compareDate = Carbon::parse('2024-09-04');
+        $compareDate = Carbon::now()->hour(0)->minute(0)->second(0);
 
 
         $dates = new Collection();
 
         while ($start->lte($end)) {
-            if (in_array($start->dayOfWeek, $daysOfWeek) && $start->gt($compareDate)) {
+            if (in_array($start->dayOfWeek, $daysOfWeek) && $start->gte($compareDate)) {
                 $dates->push($start->copy());
             }
 

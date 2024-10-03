@@ -21,7 +21,7 @@ enum AuvoDepartment: string
     public function getApiToken(): string
     {
         return match ($this) {
-            self::Expertise => env('AUVO_API_TOKEN_EXPERT'),
+            self::Expertise => env('AUVO_API_TOKEN_EXPERTISE'),
             self::Inspection => env('AUVO_API_TOKEN_INSPECTION'),
             self::Tracking => env('AUVO_API_TOKEN_TRACKING'),
             default => 'Unknown',
