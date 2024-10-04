@@ -8,13 +8,12 @@ Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote')->hourly();
 
-// Schedule::command('auvo:tracking-update')
-//     ->timezone('America/Sao_Paulo')
-//     ->dailyAt('07:00');
+Schedule::command('auvo:tracking-update')
+    ->everyThreeHours();
 
 Schedule::command('auvo:inspection-update')
     ->timezone('America/Sao_Paulo')
-    ->dailyAt('07:00');
+    ->dailyAt('08:00');
 
 Schedule::command('auvo:expertise-update')
     ->hourly();
