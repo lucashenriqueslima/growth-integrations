@@ -42,10 +42,22 @@ class SendRequestToCreateAuvoInspectionCustomer implements ShouldQueue
     public function handle(PendingRequest $rawClient): void
     {
         try {
-            $response = $this->sendRequestToCreateOrUpdateCustomer();
 
-            $this->auvoCustomerDTO->customerId = $response->json()['result']['id'];
-            $this->auvoTaskDTO->customerId = $response->json()['result']['id'];
+            $auvoCustomerId = AuvoCustomer::where('external_id', $this->auvoCustomerDTO->externalId)
+                ->where('auvo_department', $this->auvoDepartment->value)
+                ->first()
+                ->customer_id;
+
+            if ($auvoCustomerId) {
+                $this->auvoCustomerDTO->customerId = $auvoCustomerId;
+                $this->auvoTaskDTO->customerId = $auvoCustomerId;
+            } else {
+                $response = $this->sendRequestToCreateOrUpdateCustomer();
+
+                $this->auvoCustomerDTO->customerId = $response->json()['result']['id'];
+                $this->auvoTaskDTO->customerId = $response->json()['result']['id'];
+            }
+
 
             $customer = $this->updateOrCreateCustomer();
 

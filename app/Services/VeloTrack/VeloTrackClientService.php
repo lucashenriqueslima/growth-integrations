@@ -1,11 +1,11 @@
 <?php
 
-namespace App\Services\Auvo;
+namespace App\Services\VeloTrack;
 
 use App\Contracts\ClientServiceContract;
 use GuzzleHttp\Client;
 
-class AuvoClientService implements ClientServiceContract
+class VeloTrackClientService implements ClientServiceContract
 {
     private static Client $client;
 

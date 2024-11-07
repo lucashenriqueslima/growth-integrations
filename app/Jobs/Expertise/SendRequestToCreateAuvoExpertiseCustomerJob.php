@@ -35,6 +35,7 @@ class SendRequestToCreateAuvoExpertiseCustomerJob implements ShouldQueue
         try {
             $response = $this->sendRequestToCreateOrUpdateCustomer();
 
+
             $this->auvoCustomerDTO->customerId = $response->json()['result']['id'];
             $this->auvoTaskDTO->customerId = $response->json()['result']['id'];
 

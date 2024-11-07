@@ -41,6 +41,7 @@ class HandleAuvoUpdatesForExpertiseAccountCommand extends Command
 
         $auvoDepartment = AuvoDepartment::Expertise;
 
+
         Cache::put("auvo_access_token_{$auvoDepartment->value}", $auvoAccessToken);
 
         foreach ($solidyCustomers as $customer) {
@@ -71,24 +72,26 @@ class HandleAuvoUpdatesForExpertiseAccountCommand extends Command
         }
 
         foreach ($motoclubCustomers as $customer) {
-            new SendRequestToCreateAuvoExpertiseCustomerJob(
-                auvoDepartment: $auvoDepartment,
-                auvoCustomerDTO: new AuvoCustomerDTO(
-                    externalId: $customer->external_id,
-                    description: $customer->description,
-                    name: $customer->name,
-                    address: $customer->address,
-                    manager: $this->auvoAccountDataEnvironment->manager,
-                    note: $customer->note,
+            dispatch(
+                new SendRequestToCreateAuvoExpertiseCustomerJob(
+                    auvoDepartment: $auvoDepartment,
+                    auvoCustomerDTO: new AuvoCustomerDTO(
+                        externalId: $customer->external_id,
+                        description: $customer->description,
+                        name: $customer->name,
+                        address: $customer->address,
+                        manager: $this->auvoAccountDataEnvironment->manager,
+                        note: $customer->note,
+                    ),
+                    auvoTaskDTO: new AuvoTaskDTO(
+                        externalId: $customer->external_id,
+                        idUserFrom: $this->auvoAccountDataEnvironment->idUserFrom,
+                        idUserTo: $this->auvoAccountDataEnvironment->idUserFrom,
+                        orientation: $customer->description,
+                        address: $customer->address,
+                        taskType: 161234,
+                    )
                 ),
-                auvoTaskDTO: new AuvoTaskDTO(
-                    externalId: $customer->external_id,
-                    idUserFrom: $this->auvoAccountDataEnvironment->idUserFrom,
-                    idUserTo: $this->auvoAccountDataEnvironment->idUserFrom,
-                    orientation: $customer->description,
-                    address: $customer->address,
-                    taskType: 161234,
-                )
             );
         }
     }
