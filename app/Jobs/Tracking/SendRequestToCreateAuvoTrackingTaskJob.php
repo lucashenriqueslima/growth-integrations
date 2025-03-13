@@ -35,11 +35,15 @@ class SendRequestToCreateAuvoTrackingTaskJob implements ShouldQueue
         try {
             $response = $this->sendRequestToCreateOrUpdateTask();
 
+            if ($response->failed()) {
+                Log::error($response->body());
+                return;
+            }
+
             $this->auvoTaskDTO->taskId = $response->json()['result']['taskID'] ?? $response->json()['result'][0]['taskID'];
 
             $this->updateOrCreateTask();
         } catch (\Exception $e) {
-            Log::error("Error creating task " . json_encode($this->auvoTaskDTO) . "; Message: {$e->getMessage()}");
         }
     }
 }

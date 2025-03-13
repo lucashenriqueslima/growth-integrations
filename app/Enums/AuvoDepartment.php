@@ -7,6 +7,7 @@ enum AuvoDepartment: string
     case Expertise = 'expertise';
     case Inspection = 'inspection';
     case Tracking = 'tracking';
+    case AssociateSuccess = 'associate_success';
 
     public function getApiKey(): string
     {

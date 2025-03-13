@@ -16,6 +16,7 @@ use App\Services\GrowthApi\GrowthApiService;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 use Laravel\Octane\Facades\Octane;
 
 class HandleAuvoUpdatesForInspectionAccountCommand extends Command
@@ -65,12 +66,12 @@ class HandleAuvoUpdatesForInspectionAccountCommand extends Command
                             externalId: $solidyCustomer->external_id,
                             description: $solidyCustomer->name,
                             name: $solidyCustomer->name,
-                            address: $solidyCustomer->address,
+                            address: null,
                             note: $solidyCustomer->note,
                             manager: $this->auvoAccountDataEnvironment->manager,
                         ),
                         new AuvoTaskDTO(
-                            externalId: $solidyCustomer->external_id,
+                            externalId: $solidyCustomer->task_external_id,
                             address: $solidyCustomer->address,
                             idUserFrom: $this->auvoAccountDataEnvironment->idUserFrom,
                             idUserTo: $workshop['collaborator']['auvo_id'] ?? null,
@@ -100,7 +101,7 @@ class HandleAuvoUpdatesForInspectionAccountCommand extends Command
                             manager: $this->auvoAccountDataEnvironment->manager,
                         ),
                         new AuvoTaskDTO(
-                            externalId: $motoclubCustomer->external_id,
+                            externalId: $motoclubCustomer->task_external_id,
                             address: $motoclubCustomer->address,
                             idUserFrom: $this->auvoAccountDataEnvironment->idUserFrom,
                             idUserTo: $workshop['collaborator']['auvo_id'] ?? null,
@@ -131,7 +132,7 @@ class HandleAuvoUpdatesForInspectionAccountCommand extends Command
                             manager: $this->auvoAccountDataEnvironment->manager,
                         ),
                         new AuvoTaskDTO(
-                            externalId: $novaCustomer->external_id,
+                            externalId: $novaCustomer->task_external_id,
                             address: $novaCustomer->address,
                             idUserFrom: $this->auvoAccountDataEnvironment->idUserFrom,
                             idUserTo: $workshop['collaborator']['auvo_id'] ?? null,
@@ -147,34 +148,5 @@ class HandleAuvoUpdatesForInspectionAccountCommand extends Command
         } catch (\Exception $e) {
             dd($e);
         }
-
-
-        // foreach ($solidyCustomers as $solidyCustomer) {
-
-
-        //     dd($workshop);
-
-        //     dispatch(new SendRequestToCreateAuvoInspectionCustomer(
-        //         new AuvoCustomerDTO(
-        //             externalId: $solidyCustomer->external_id,
-        //             description: $solidyCustomer->name,
-        //             name: $solidyCustomer->name,
-        //             address: $solidyCustomer->address,
-        //             note: $solidyCustomer->note,
-        //             workshopId: $workshops->firstWhere('name', 'Solidy')->id,
-        //         ),
-        //         new AuvoTaskDTO(
-        //             externalId: $solidyCustomer->external_id,
-        //         ),
-        //         $solidyCustomer->workshop_id,
-        //     ),);
-        // }
     }
-
-
-    // protected function getCollaboratorByWorkshopId(int $workshopId): string
-    // {
-    //     $workshop = $this->auvoAccountDataEnvironment->workshops->firstWhere('id', $workshopId);
-    //     return $workshop->collaborator;
-    // }
 }

@@ -13,7 +13,10 @@ Schedule::command('auvo:tracking-update')
 
 Schedule::command('auvo:inspection-update')
     ->timezone('America/Sao_Paulo')
-    ->dailyAt('08:00');
+    ->dailyAt('04:00');
 
 Schedule::command('auvo:expertise-update')
     ->hourly();
+
+Schedule::command('auvo:associate-success-update')
+    ->everyTwoHours();

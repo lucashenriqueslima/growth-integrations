@@ -34,6 +34,7 @@ final class AuvoTaskDTO
         return
             array_filter(
                 [
+                    'id' => $this->taskId,
                     'externalId' => $this->externalId,
                     'idUserFrom' => $this->idUserFrom,
                     'idUserTo' => $this->idUserTo,
@@ -50,7 +51,6 @@ final class AuvoTaskDTO
                     'attachments' => $this->attachments,
                     'keyWords' => $this->keyWords,
                     'taskType' => $this->taskType,
-                    'customerExternalId' => $this->externalId,
                     'checkInType' => 1,
                 ],
                 fn($value) => $value !== null

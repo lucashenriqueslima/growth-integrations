@@ -9,6 +9,8 @@ class Kernel extends ConsoleKernel
     protected $commands = [
         \App\Console\Commands\HandleAuvoUpdatesForExpertiseAccountCommand::class,
         \App\Console\Commands\HandleAuvoUpdatesForInspectionAccountCommand::class,
+        \App\Console\Commands\HandleAuvoUpdatesForTrackingAccountCommand::class,
+        \App\Console\Commands\HandleAuvoUpdatesForAssociateSuccessAccountCommand::class,
         \App\Console\Commands\CountData::class,
     ];
 

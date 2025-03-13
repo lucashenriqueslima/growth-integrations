@@ -37,9 +37,9 @@ class AuvoService
     {
 
         return [
-            IlevaAccidentInvolved::getAccidentInvolvedForAuvoToMotoclub('ileva'),
-            IlevaAccidentInvolved::getAccidentInvolvedForAuvoToSolidy('ileva_motoclub'),
-            IlevaAccidentInvolved::getAccidentInvolvedForAuvoToNova('ileva_nova'),
+            IlevaAccidentInvolved::getAccidentInvolvedForAuvoToMotoclub(),
+            IlevaAccidentInvolved::getAccidentInvolvedForAuvoToSolidy(),
+            IlevaAccidentInvolved::getAccidentInvolvedForAuvoToNova(),
         ];
     }
 
@@ -57,6 +57,17 @@ class AuvoService
             fn() => IlevaAssociateVehicle::getVehiclesForAuvoTrackingInSolidy(),
             fn() => IlevaAssociateVehicle::getVehiclesForAuvoTrackingInMotoclub(),
         ], 50000);
+    }
+
+    public static function getIlevaDatabaseCustomersForSuccessAssociateAuvoAccount(): array
+    {
+        return Octane::concurrently(
+            [
+                fn() => IlevaAccidentInvolved::getAccidentInvolvedForAuvoAssociateSuccessInSolidy(),
+                fn() => IlevaAccidentInvolved::getAccidentInvolvedForAuvoAssociateSuccessInMotoclub(),
+            ],
+            50000
+        );
     }
 
     public function dispatchUpdateJobs(

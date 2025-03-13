@@ -13,4 +13,8 @@ return [
         'api_key' => env('AUVO_API_KEY_TRACKING'),
         'api_token' => env('AUVO_API_TOKEN_TRACKING'),
     ],
+    'associate_success' => [
+        'api_key' => env('AUVO_API_KEY_ASSOCIATE_SUCCESS'),
+        'api_token' => env('AUVO_API_TOKEN_ASSOCIATE_SUCCESS'),
+    ]
 ];

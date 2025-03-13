@@ -69,15 +69,6 @@ class SendRequestToCreateAuvoTrackingCustomerJob implements ShouldQueue
                     )
                 );
 
-
-                dispatch(
-                    new SendRequestToCreateAuvoTrackingTaskJob(
-                        $this->auvoDepartment,
-                        $this->auvoCustomerDTO,
-                        $this->auvoTaskDTO,
-                    )
-                );
-
                 return;
             }
 

@@ -19,8 +19,8 @@ class IlevaAccidentInvolved extends Model
     {
         return DB::connection('ileva')
             ->select("
-              SELECT DISTINCT
-    par.id external_id,
+    SELECT par.id AS external_id,
+    haso.id AS task_external_id,
     CONCAT(par.id, ' / ', par.nome, ' / ', par.placa) AS `name`,
     status.id_pai,
     tipe.id_participant,
@@ -31,7 +31,7 @@ class IlevaAccidentInvolved extends Model
     par.placa,
     par.cpf_cnpj AS cpfCnpj,
     has.id AS workshop_id,
-    CONCAT(IFNULL(has.nome, ''), ' / ', IFNULL(has.endereco, ''), ' / ', IFNULL(city.cidade, ''), ' - ', IFNULL(state.uf, '')) AS address,
+    CONCAT(IFNULL(has.nome, ''), ' / ', IFNULL(has.endereco, ''), ' / ', IFNULL(city.cidade, '')) AS address,
     CONCAT(IFNULL(has.nome, ''), ' / Placa: ', IFNULL(par.placa, ''), ' / Veículo: ', IFNULL(par.modelo_veiculo, '')) AS orientation,
     par.telefone AS phone,
     par.email,
@@ -79,8 +79,9 @@ WHERE status.id_status = 6
         ),
         status.leave_at
     ) IS NULL
-  AND (has.id IS NULL OR has.id != 2670)
-  AND (haso.id_store IS NULL OR haso.id_store != 2670)
+    AND (has.id IS NULL OR has.id != 2670)
+  AND (haso.id_tipo IN (1, 13))
+  AND (haso.`status` = 'Aprovada')
 GROUP BY tipe.id_participant;
         ");
     }
@@ -89,8 +90,9 @@ GROUP BY tipe.id_participant;
     {
         return DB::connection('ileva_motoclub')
             ->select("
-              SELECT DISTINCT
+              SELECT
     CONCAT ('mc', par.id) external_id,
+    CONCAT ('mc', haso.id) AS task_external_id,
     CONCAT('mc', par.id, ' / ', par.nome, ' / ', par.placa) AS `name`,
     tipe.id_participant,
     (
@@ -107,8 +109,8 @@ GROUP BY tipe.id_participant;
     par.placa,
     par.cpf_cnpj AS cpfCnpj,
     has.id AS workshop_id,
-    CONCAT(IFNULL(has.nome, ''), ' / ', IFNULL(has.endereco, ''), ' / ', IFNULL(city.cidade, ''), ' - ', IFNULL(state.uf, '')) AS address,
-    CONCAT(IFNULL(has.nome, ''), ' / Placa: ', IFNULL(par.placa, ''), ' / Veículo: ', IFNULL(par.modelo_veiculo, '')) AS orientation,
+    CONCAT(IFNULL(has.nome, ''), ' / ', IFNULL(has.endereco, ''), ' / ', IFNULL(city.cidade, '')) AS address,
+    CONCAT('Placa: ', IFNULL(par.placa, ''), ' / Veículo: ', IFNULL(par.modelo_veiculo, '')) AS orientation,
     par.telefone AS phone,
     par.email,
     par.id_sinister,
@@ -154,9 +156,8 @@ WHERE status.id_status = 6
         ),
         status.leave_at
     ) IS NULL
-  AND (has.id IS NULL OR has.id != 2670)
-  AND (haso.id_store IS NULL OR haso.id_store != 2670)
-GROUP BY tipe.id_participant;
+    AND (haso.`status` = 'Aprovada')
+    GROUP BY tipe.id_participant;
         ");
     }
 
@@ -166,6 +167,7 @@ GROUP BY tipe.id_participant;
             ->select("
             SELECT DISTINCT
     CONCAT('nv', par.id) external_id,
+    CONCAT('nv', haso.id) AS task_external_id,
     CONCAT('nv', par.id, ' / ', par.nome, ' / ', par.placa) AS `name`,
     status.id_pai,
     tipe.id_participant,
@@ -175,8 +177,8 @@ GROUP BY tipe.id_participant;
     par.placa,
     par.cpf_cnpj AS cpfCnpj,
     has.id AS workshop_id,
-    CONCAT(IFNULL(has.nome, ''), ' / ', IFNULL(has.endereco, ''), ' / ', IFNULL(city.cidade, ''), ' - ', IFNULL(state.uf, '')) AS address,
-    CONCAT(IFNULL(has.nome, ''), ' / Placa: ', IFNULL(par.placa, ''), ' / Veículo: ', IFNULL(par.modelo_veiculo, '')) AS orientation,
+    CONCAT(IFNULL(has.nome, ''), ' / ', IFNULL(has.endereco, ''), ' / ', IFNULL(city.cidade, '')) AS address,
+    CONCAT('Placa: ', IFNULL(par.placa, ''), ' / Veículo: ', IFNULL(par.modelo_veiculo, '')) AS orientation,
     par.telefone AS phone,
     par.email,
     par.id_sinister,
@@ -222,9 +224,8 @@ WHERE status.id_status = 6
         ),
         status.leave_at
     ) IS NULL
-  AND (has.id IS NULL OR has.id != 2670)
-  AND (haso.id_store IS NULL OR haso.id_store != 2670)
-GROUP BY tipe.id_participant;
+    AND (haso.`status` = 'Aprovada')
+    GROUP BY tipe.id_participant;
         ");
     }
 
@@ -249,7 +250,7 @@ ELSE (
         )
 END `description`,
 CONCAT(IFNULL(hmuc.cidade, ''), ' - ', IFNULL(hmus.estado, '')) address,
-DATE_FORMAT(status.create_at, '%Y-%m-%dT%H:%i:%s	') task_date
+DATE_FORMAT(status.create_at, '%Y-%m-%dT%H:%i:%s') task_date
 FROM hbrd_adm_sinister_participant_status_history status
 LEFT JOIN hbrd_adm_sinister_participant_type_history tipe ON status.id_pai = tipe.id
 LEFT JOIN hbrd_adm_sinister_status s ON status.id_status = s.id
@@ -332,5 +333,71 @@ GROUP BY tipe.id_participant;
         } catch (\Exception $e) {
             return collect([]);
         }
+    }
+
+    public static function getAccidentInvolvedForAuvoAssociateSuccessInSolidy(): Collection
+    {
+
+        return collect(DB::connection('ileva')
+            ->select(
+                "
+                SELECT par.id AS external_id,
+CONCAT(par.id, 'W', WEEKOFYEAR(CURDATE()), 'Y', YEAR(CURDATE())) AS task_external_id,
+CONCAT(par.id, ' / ', par.nome, ' / ', par.placa, ' / ', IFNULL(state.uf, '')) AS `name`,
+tipe.id_participant,
+    par.cpf_cnpj AS cpfCnpj,
+    has.id AS workshop_id,
+    CONCAT(IFNULL(has.nome, ''), ' / ', IFNULL(has.endereco, ''), ' / ', IFNULL(city.cidade, '')) AS address,
+    CONCAT(IFNULL(has.nome, ''), ' / Placa: ', IFNULL(par.placa, ''), ' / Veículo: ', IFNULL(par.modelo_veiculo, '')) AS orientation,
+    par.telefone AS phone,
+    par.email,
+    state.uf,
+    UPPER(hmu.nome) colaborator_name
+FROM hbrd_adm_sinister_participant par
+LEFT JOIN hbrd_adm_sinister_participant_type_history tipe ON par.id = tipe.id
+LEFT JOIN hbrd_adm_sinister_history sh ON sh.id_sinister = par.id_sinister
+LEFT JOIN hbrd_adm_sinister_order haso ON haso.id_participant = par.id
+LEFT JOIN hbrd_adm_store has ON has.id = haso.id_store
+LEFT JOIN hbrd_main_util_city city ON city.id = par.id_cidade
+LEFT JOIN hbrd_main_util_state state ON state.id = par.id_estado
+LEFT JOIN hbrd_main_user hmu ON hmu.id = par.id_colaborador
+WHERE tipe.id_tipo IN (8, 14)
+AND hmu.nome IS NOT NULL
+AND DATEDIFF(NOW(), par.create_at) <= 46
+AND par.status = 'Ativo'
+GROUP BY tipe.id_participant;
+                "
+            ));
+    }
+
+    public static function getAccidentInvolvedForAuvoAssociateSuccessInMotoclub(): Collection
+    {
+
+        return collect(DB::connection('ileva_motoclub')
+            ->select(
+                "SELECT CONCAT('mc', par.id) AS external_id,
+CONCAT('mc', par.id, 'W', WEEKOFYEAR(CURDATE()), 'Y', YEAR(CURDATE())) AS task_external_id,
+CONCAT('mc', par.id, ' / ', par.nome, ' / ', par.placa, ' / ', IFNULL(state.uf, '')) AS `name`,
+tipe.id_participant,
+par.cpf_cnpj AS cpfCnpj,
+CONCAT(IFNULL(has.nome, ''), ' / ', IFNULL(has.endereco, ''), ' / ', IFNULL(city.cidade, '')) AS address,
+CONCAT(IFNULL(has.nome, ''), ' / Placa: ', IFNULL(par.placa, ''), ' / Veículo: ', IFNULL(par.modelo_veiculo, '')) AS orientation,
+par.telefone AS phone,
+par.email,
+state.uf,
+UPPER(hmu.nome) colaborator_name
+FROM hbrd_adm_sinister_participant par
+LEFT JOIN hbrd_adm_sinister_participant_type_history tipe ON par.id = tipe.id
+LEFT JOIN hbrd_adm_sinister_history sh ON sh.id_sinister = par.id_sinister
+LEFT JOIN hbrd_adm_sinister_order haso ON haso.id_participant = par.id
+LEFT JOIN hbrd_adm_store has ON has.id = haso.id_store
+LEFT JOIN hbrd_main_util_city city ON city.id = par.id_cidade
+LEFT JOIN hbrd_main_util_state state ON state.id = par.id_estado
+LEFT JOIN hbrd_main_user hmu ON hmu.id = par.id_colaborador
+WHERE tipe.id_tipo IN (8)
+AND DATEDIFF(NOW(), par.create_at) <= 46
+AND par.status = 'Ativo'
+GROUP BY tipe.id_participant;"
+            ));
     }
 }

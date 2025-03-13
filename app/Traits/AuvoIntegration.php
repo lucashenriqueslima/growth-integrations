@@ -113,18 +113,18 @@ trait AuvoIntegration
         } catch (ConnectionException $e) {
             $this->release(30);
         } catch (\Exception $e) {
-            Log::error("Exception: {${json_encode($data)}}: {$e->getMessage()}");
-            return null;
+            // dd($e);
+            // return null;
         }
     }
 
     public function sendRequestToCreateOrUpdateCustomer(): ?Response
     {
         try {
-
             $this->httpClient = $this->getConfiguredHttpClient();
 
             $data = $this->auvoCustomerDTO->toArray();
+
 
             $result = $this->httpClient->put('customers', $data);
 
@@ -140,11 +140,10 @@ trait AuvoIntegration
 
             return $result;
         } catch (ConnectionException $e) {
-            $this->release(30);
+            // $this->release(30);
         } catch (\Exception $e) {
             // dd($e);
             Log::error("Exception: {$e->getMessage()}");
-            return null;
         }
     }
 
@@ -163,18 +162,16 @@ trait AuvoIntegration
                 return $this->httpClient->put('tasks', $data);
             }
 
-            if (!in_array($result->status(), [200, 201])) {
+            if (!$result->successful()) {
                 Log::error("Error: {${json_encode($data)}}: {$result->body()}");
 
                 return $result;
             }
 
             return $result;
-        } catch (ConnectionException $e) {
-            $this->release(30);
         } catch (\Exception $e) {
-            Log::error("Exception: {${json_encode($data)}}: {$e->getMessage()}");
-            return null;
+            Log::error("Exception: {${json_encode($this->auvoCustomerDTO->toArray())}}: {$e->getMessage()}");
+            $this->release(30);
         }
     }
 
@@ -228,6 +225,60 @@ trait AuvoIntegration
             return $result;
         } catch (\Exception $e) {
             Log::error("Exception: {${json_encode($data)}}: {$e->getMessage()}");
+            return null;
+        }
+    }
+
+    public function getListUsers(): ?Response
+    {
+        try {
+            $this->httpClient = $this->getConfiguredHttpClient();
+
+            $result = $this->httpClient->get('users', "/?paramFilter=&page=1&pageSize=100&order=asc");
+
+            if ($result->status() === 401) {
+                $this->renewAccessToken();
+                $this->httpClient = $this->getConfiguredHttpClient();
+                return $this->httpClient->get('users', "/?paramFilter=&page=1&pageSize=100&order=asc");
+            }
+
+            if (!in_array($result->status(), [200, 201])) {
+                Log::error("Error: {$result->body()}");
+
+                return $result;
+            }
+
+
+            return $result;
+        } catch (\Exception $e) {
+            Log::error("Exception: {$e->getMessage()}");
+            return null;
+        }
+    }
+
+    public function getListTeams(): ?Response
+    {
+        try {
+            $this->httpClient = $this->getConfiguredHttpClient();
+
+            $result = $this->httpClient->get('teams', "/?paramFilter=&page=1&pageSize=100&order=asc");
+
+            if ($result->status() === 401) {
+                $this->renewAccessToken();
+                $this->httpClient = $this->getConfiguredHttpClient();
+                return $this->httpClient->get('teams', "/?paramFilter=&page=1&pageSize=100&order=asc");
+            }
+
+            if (!in_array($result->status(), [200, 201])) {
+                Log::error("Error: {$result->body()}");
+
+                return $result;
+            }
+
+
+            return $result;
+        } catch (\Exception $e) {
+            Log::error("Exception: {$e->getMessage()}");
             return null;
         }
     }

@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Jobs\Inspection;
+namespace App\Jobs\SuccessAssociate;
 
 use App\DTO\AuvoCustomerDTO;
 use App\DTO\AuvoTaskDTO;
@@ -13,7 +13,7 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
 
-class SendRequestToCreateAuvoInspectionTask implements ShouldQueue
+class SendRequestToCreateAuvoSuccessAssociateTaskJob implements ShouldQueue
 {
     use Queueable, InteractsWithQueue, Queueable, SerializesModels, AuvoIntegration;
 
@@ -24,36 +24,23 @@ class SendRequestToCreateAuvoInspectionTask implements ShouldQueue
         protected readonly AuvoDepartment $auvoDepartment,
         protected readonly AuvoCustomerDTO $auvoCustomerDTO,
         protected readonly AuvoTaskDTO $auvoTaskDTO,
-        public string $sufixDate,
     ) {
         //
     }
 
-    /**
-     * Execute the job.
-     */
     public function handle(): void
     {
         try {
 
-            if (strlen($this->auvoTaskDTO->externalId) > 15) {
-                Log::error("external id to long " . json_encode($this->auvoTaskDTO->toArray()));
-                return;
-            }
-
-            $response = $this->sendRequestToCreateOrUpdateTask();
-
-            if (!$response->successful()) {
-
-                Log::error("Status" . $response->status()  . "  Tarefa " . json_encode($this->auvoTaskDTO->toArray()));
-                return;
-            }
+            $response = $this->sendRequestToCreateTask();
 
             $this->auvoTaskDTO->taskId = $response->json()['result']['taskID'] ?? $response->json()['result'][0]['taskID'];
 
-            $this->updateOrCreateTask();
+            $customer = $this->updateOrCreateTask();
+
+            $this->auvoTaskDTO->auvoCostumerId = $customer->id;
         } catch (\Exception $e) {
-            Log::error("Error creating task " . json_encode($this->auvoTaskDTO->toArray()) . "; Message: {$e->getMessage()}");
+            Log::error($e->getMessage());
         }
     }
 }

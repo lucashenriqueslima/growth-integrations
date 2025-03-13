@@ -28,11 +28,11 @@ class SendRequestToCreateAuvoInspectionCustomer implements ShouldQueue
      * Create a new job instance.
      */
     public function __construct(
-        protected readonly AuvoDepartment $auvoDepartment,
-        protected readonly AuvoCustomerDTO $auvoCustomerDTO,
-        protected readonly AuvoTaskDTO $auvoTaskDTO,
-        protected readonly string $startDate,
-        protected readonly ?array $workshop = null,
+        public readonly AuvoDepartment $auvoDepartment,
+        public readonly AuvoCustomerDTO $auvoCustomerDTO,
+        public AuvoTaskDTO $auvoTaskDTO,
+        public readonly string $startDate,
+        public readonly ?array $workshop = null,
     ) {}
 
 
@@ -45,8 +45,7 @@ class SendRequestToCreateAuvoInspectionCustomer implements ShouldQueue
 
             $auvoCustomerId = AuvoCustomer::where('external_id', $this->auvoCustomerDTO->externalId)
                 ->where('auvo_department', $this->auvoDepartment->value)
-                ->first()
-                ->customer_id;
+                ->first()?->customer_id;
 
             if ($auvoCustomerId) {
                 $this->auvoCustomerDTO->customerId = $auvoCustomerId;
@@ -61,40 +60,41 @@ class SendRequestToCreateAuvoInspectionCustomer implements ShouldQueue
 
             $customer = $this->updateOrCreateCustomer();
 
-            if (!$this->workshop) {
-                return;
-            }
+            // if (!$this->workshop) {
+            return;
+            // }
 
             $this->auvoTaskDTO->auvoCostumerId = $customer->id;
 
             $specificDays = $this->getSpecificDays($this->startDate, $this->workshop['days_of_week'], $this->workshop['visit_time']);
 
-
-
             $specificDays->each(function ($specificDay) use (&$tasks) {
 
                 $sufixDate = $specificDay->format('Ymd');
 
-                if (
-                    AuvoTask::where('external_id', "{$this->auvoCustomerDTO->externalId}{$sufixDate}")
+                $this->auvoTaskDTO->externalId = "{$this->auvoTaskDTO->externalId}{$sufixDate}";
+
+                $auvoTaskId = AuvoTask::where('external_id', $this->auvoTaskDTO->externalId)
                     ->where('auvo_department', $this->auvoDepartment->value)
-                    ->exists()
-                ) {
+                    ->first()?->task_id;
+
+                if ($auvoTaskId) {
                     return;
                 }
 
                 $this->auvoTaskDTO->taskDate = $specificDay->format('Y-m-d\TH:i:s');
 
-                $this->auvoTaskDTO->externalId = "{$this->auvoCustomerDTO->externalId}{$sufixDate}";
 
 
-                dispatch(
-                    new SendRequestToCreateAuvoInspectionTask(
-                        $this->auvoDepartment,
-                        $this->auvoCustomerDTO,
-                        $this->auvoTaskDTO,
-                    )
-                );
+                // dispatch(
+                //     new SendRequestToCreateAuvoInspectionTask(
+                //         $this->auvoDepartment,
+                //         $this->auvoCustomerDTO,
+                //         $this->auvoTaskDTO,
+                //         $sufixDate,
+
+                //     )
+                // );
             });
         } catch (\Exception $e) {
             Log::error($e->getMessage());
@@ -111,8 +111,18 @@ class SendRequestToCreateAuvoInspectionCustomer implements ShouldQueue
 
         $dates = new Collection();
 
+        //writeln
+        $startOfNextWeek = Carbon::now()->startOfWeek();
+        $endOfNextWeek = Carbon::now()->endOfWeek();
+
+
+        //verify if it is in this week
         while ($start->lte($end)) {
-            if (in_array($start->dayOfWeek, $daysOfWeek) && $start->gte($compareDate)) {
+            if (
+                in_array($start->dayOfWeek, $daysOfWeek) &&
+                $start->gte($compareDate) &&
+                $start->between($startOfNextWeek, $endOfNextWeek)
+            ) {
                 $dates->push($start->copy());
             }
 
