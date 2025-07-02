@@ -72,7 +72,7 @@ class IlevaAssociateVehicle extends Model
             LEFT JOIN hbrd_adm_consultant hac on hac.id = hav.id_consultor
             WHERE has.id IN (1, 3, 4, 5, 7, 8, 9, 10, 16)
             AND hab.id IN (31, 118, 119, 122, 123, 130, 181)
-            AND hav.dt_contrato > '2025-02-18'
+            AND hav.dt_contrato > '2025-04-20'
 
             ");
         } catch (\Exception $e) {
@@ -113,7 +113,7 @@ class IlevaAssociateVehicle extends Model
             LEFT JOIN hbrd_adm_fipe haf ON hav.codigo_fipe = haf.codigofipe
             LEFT JOIN hbrd_adm_consultant hac on hac.id = hav.id_consultor
             WHERE hab.id IN (48, 121, 126, 130, 137, 138, 141, 169, 180)
-            AND hav.dt_contrato >= '2025-02-18';
+            AND hav.dt_contrato >= '2025-04-20';
             ");
         } catch (\Exception $e) {
             Log::error('Error on getVehiclesForAuvoTrackingInSolidy', ['error' => $e->getMessage()]);

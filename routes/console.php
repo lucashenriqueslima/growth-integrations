@@ -9,14 +9,17 @@ Artisan::command('inspire', function () {
 })->purpose('Display an inspiring quote')->hourly();
 
 Schedule::command('auvo:tracking-update')
-    ->everyThreeHours();
+    ->timezone('America/Sao_Paulo')
+    ->dailyAt('06:00')
+    ->dailyAt('13:00');
 
 Schedule::command('auvo:inspection-update')
     ->timezone('America/Sao_Paulo')
-    ->dailyAt('04:00');
+    ->dailyAt('02:00');
 
 Schedule::command('auvo:expertise-update')
-    ->hourly();
+    ->everyFourHours();
 
 Schedule::command('auvo:associate-success-update')
-    ->everyTwoHours();
+    ->timezone('America/Sao_Paulo')
+    ->dailyAt('00:00');

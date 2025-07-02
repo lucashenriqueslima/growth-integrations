@@ -15,6 +15,7 @@ use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
+use Ramsey\Uuid\Type\Integer;
 
 class HandleAuvoUpdatesForAssociateSuccessAccountCommand extends Command
 {
@@ -50,9 +51,6 @@ class HandleAuvoUpdatesForAssociateSuccessAccountCommand extends Command
         );
 
 
-
-
-
         $auvoAccessToken = (new AuvoAuthService(
             $this->auvoAccountDataEnvironment->apiKey,
             $this->auvoAccountDataEnvironment->apiToken,
@@ -63,49 +61,94 @@ class HandleAuvoUpdatesForAssociateSuccessAccountCommand extends Command
         Cache::put("auvo_access_token_{$this->auvoDepartment->value}", $auvoAccessToken);
 
         $colaborators = $this->getListUsers()->json()['result']['entityList'];
-
+        //Log::info($colaborators);
         $colaborators = $this->generateCollection($colaborators);
-
-        // $teams = $this->getListTeams()->json()['result']['entityList'];
-
-        // $teams = $this->generateCollection($teams);
-
-
-        [$solidyCustomers, $motoclubCustomers] = AuvoService::getIlevaDatabaseCustomersForSuccessAssociateAuvoAccount();
+        
+        [
+            $solidyCustomers,
+            //$solidyWorkshopOutCustomers,
+            //$solidyWorkshopOutLateCustomers,
+            $motoclubCustomers,
+            //$motoclubWorkshopOutCustomers,
+            //$motoclubWorkshopOutLateCustomers
+        ] = AuvoService::getIlevaDatabaseCustomersForSuccessAssociateAuvoAccount();
 
         $remainingWorkdays = $this->getRemainingWorkdays();
+        $sevenDays = $this->getNextSevenDays();
 
         $this->handleDistribution(
             $colaborators,
             $solidyCustomers,
-            $remainingWorkdays
+            $remainingWorkdays,
+            false
         );
+
+        // $this->handleDistribution(
+        //     $colaborators,
+        //     $solidyWorkshopOutCustomers,
+        //     $sevenDays,
+        //     true
+        // );
+
+        // $this->handleDistribution(
+        //     $colaborators,
+        //     $solidyWorkshopOutLateCustomers,
+        //     $sevenDays,
+        //     true
+        // );
 
         $this->handleDistribution(
             $colaborators,
             $motoclubCustomers,
-            $remainingWorkdays
+            $remainingWorkdays,
+            false
         );
 
-        $customersWithoutColaborator = $solidyCustomers->filter(function ($customer) use ($colaborators) {
-            return !in_array($customer->colaborator_name, $colaborators->pluck('name')->toArray());
-        });
+        // $this->handleDistribution(
+        //     $colaborators,
+        //     $motoclubWorkshopOutCustomers,
+        //     $sevenDays,
+        //     true
+        // );
+
+        // $this->handleDistribution(
+        //     $colaborators,
+        //     $motoclubWorkshopOutLateCustomers,
+        //     $sevenDays,
+        //     true
+        // );
     }
 
     private function handleDistribution(
         Collection $colaborators,
         Collection $customers,
-        array $remainingWorkdays
+        array $Workdays,
+        bool $afeterWorkshop
     ) {
-        $colaborators->each(function ($colaborator) use ($customers, $colaborators, $remainingWorkdays) {
+        
+        $totalCollaborators = $colaborators->count();
+        
+        $customerChunks = $customers->chunk(ceil($customers->count() / $totalCollaborators));
+        $customerChunks->each(function ($chunk, $index) use ($colaborators, $Workdays, $afeterWorkshop) {
+            $colaborator = $colaborators->get($index);
+        
+            
+            if (!$colaborator) {
+                return;
+            }
+            
+            // Distribui os dias para os clientes desse chunk
+            $distributed = $this->distributeDates($chunk, $Workdays);
+         
+            // Envia os jobs
+            // if($afeterWorkshop) {
+            //     $this->handleDispatchJobsAfterWorkshop($distributed, $colaborator->userID);
+            // } else {
+            //     $this->handleDispatchJobs($distributed, $colaborator->userID);
+            // }
 
-            $customersByCollaborators = $customers->filter(function ($customer) use ($colaborator) {
-                return $customer->colaborator_name == $colaborator->name;
-            });
-
-            $customersByCollaboratorsDistributedByWeekDay = $this->distributeDates($customersByCollaborators, $remainingWorkdays);
-
-            $this->handleDispatchJobs($customersByCollaboratorsDistributedByWeekDay, $colaborator->userID);
+            $this->handleDispatchJobs($distributed, $colaborator->userID);
+            
         });
     }
 
@@ -130,6 +173,34 @@ class HandleAuvoUpdatesForAssociateSuccessAccountCommand extends Command
                         idUserTo: $idUserTo,
                         orientation: $customer->orientation,
                         taskDate: $customer?->taskDate,
+                    ),
+                )
+            );
+        }
+    }
+
+    private function handleDispatchJobsAfterWorkshop(Collection $customers, ?int $idUserTo = null)
+    {
+        foreach ($customers as $customer) {
+            dispatch(
+                new SendRequestToCreateAuvoSuccessAssociateCustomerJob(
+                    auvoDepartment: $this->auvoDepartment,
+                    auvoCustomerDTO: new AuvoCustomerDTO(
+                        externalId: $customer->external_id,
+                        description: $customer->orientation,
+                        name: $customer->name,
+                        address: $customer->address,
+                        manager: $this->auvoAccountDataEnvironment->manager,
+                        note: $customer->orientation,
+
+                    ),
+                    auvoTaskDTO: new AuvoTaskDTO(
+                        externalId: $customer->task_external_id,
+                        idUserFrom: $this->auvoAccountDataEnvironment->idUserFrom,
+                        idUserTo: $idUserTo,
+                        orientation: $customer->orientation,
+                        taskDate: $customer?->taskDate,
+                        taskId: 192373
                     ),
                 )
             );
@@ -176,23 +247,50 @@ class HandleAuvoUpdatesForAssociateSuccessAccountCommand extends Command
 
         // Loop até sexta-feira
         while ($currentDay->dayOfWeek <= Carbon::FRIDAY) {
-            if ($currentDay->dayOfWeek !== Carbon::MONDAY) {
+     
                 $remainingDays[] = $currentDay->format('Y-m-d\TH:i:s'); // Formato ISO 8601
-            }
-            $currentDay->addDay();
+                $currentDay->addDay();
         }
 
         return $remainingDays;
     }
 
+    private function getNextSevenDays()
+    {
+        $today = now();
+        $days = [];
+
+        $currentDay = $today->copy();
+
+        for ($i = 0; $i < 7; $i++) {
+            $days[] = $currentDay->format('Y-m-d\TH:i:s'); // Formato ISO 8601
+            $currentDay->addDay();
+        }
+
+        return $days;
+    }
+
+
+    public function filterCollaboratorsById(array $items): array {
+        $filteredItems = array_filter($items, function ($item) {
+            return in_array($item['userID'], [194479]);
+        });
+
+        return $filteredItems;
+    }
+
     private function generateCollection(array $items): Collection
     {
+       $filteredItems = $this->filterCollaboratorsById($items);
+
+        // Monta a Collection só com os filtrados
         $collection = new Collection();
 
-        foreach ($items as $item) {
+        foreach ($filteredItems as $item) {
             $collection->push((object) $item);
         }
 
         return $collection;
     }
+
 }

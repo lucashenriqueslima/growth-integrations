@@ -320,23 +320,57 @@ GROUP BY tipe.id_participant;
         try {
             return collect(
                 DB::connection('ileva_motoclub')
-                    ->select("
-SELECT DISTINCT
-CONCAT('mc', par.id) external_id,
-CONCAT('mc', par.id) note,
-CONCAT('mc_', par.placa) name,
-'motoclub' customer_group,
-CASE
-WHEN par.associado = 1 THEN CONCAT('Associado: ', IFNULL(par.nome, ''), ' \\n', 'CPF: ', IFNULL(par.cpf_cnpj, ''), ' \\n', 'Placa: ', IFNULL(par.placa, ''), ' \\n', 'Montadora: ', IFNULL(par.montadora, ''), ' \\n', 'Modelo: ', IFNULL(par.modelo_veiculo, ''), ' \\n', 'Chassi: ', IFNULL(par.chassi, ''), ' \\n', 'Cor: ', IFNULL(par.cor, ''))
-ELSE (
-        SELECT CONCAT('Associado: ', IFNULL(par2.nome, ''), ' \\n', 'CPF: ', IFNULL(par2.cpf_cnpj, ''), ' \\n', 'Placa: ', IFNULL(par2.placa, ''), ' \\n', 'Montadora: ', IFNULL(par2.montadora, ''), ' \\n', 'Modelo: ', IFNULL(par2.modelo_veiculo, ''), ' \\n', 'Chassi: ', IFNULL(par2.chassi, ''), ' \\n', 'Cor: ', IFNULL(par2.cor, ''))
-        FROM hbrd_adm_sinister_participant par2
-        WHERE par2.associado = 1
-        AND par2.id_sinister = par.id_sinister
+                    ->select("SELECT
+    CONCAT('mc', par.id) AS external_id, has.id,
+    CONCAT('mc', par.id) AS note,
+    CONCAT('mc_', par.placa) AS name,
+    'motoclub' AS customer_group,
+    CASE
+        WHEN par.associado = 1 THEN
+            CONCAT(
+                'Associado: ', IFNULL(par.nome, ''), ' \n',
+                'CPF: ', IFNULL(par.cpf_cnpj, ''), ' \n',
+                'Placa: ', IFNULL(par.placa, ''), ' \n',
+                'Montadora: ', IFNULL(par.montadora, ''), ' \n',
+                'Modelo: ', IFNULL(par.modelo_veiculo, ''), ' \n',
+                'Chassi: ', IFNULL(par.chassi, ''), ' \n',
+                'Cor: ', IFNULL(par.cor, ''), ' \n\n',
+                'Terceiros: ', IFNULL(
+                        (
+                            SELECT GROUP_CONCAT(CONCAT(par4.nome, ' | ', par4.placa) SEPARATOR ' \n')
+                            FROM hbrd_adm_sinister_participant par4
+                            WHERE par4.associado = 0
+                            AND par4.id_sinister = par.id_sinister
+                        ), ''
+                    )
+            )
+        ELSE (
+            SELECT
+                CONCAT(
+                    'Associado: ', IFNULL(par2.nome, ''), ' \n',
+                    'CPF: ', IFNULL(par2.cpf_cnpj, ''), ' \n',
+                    'Placa: ', IFNULL(par2.placa, ''), ' \n',
+                    'Montadora: ', IFNULL(par2.montadora, ''), ' \n',
+                    'Modelo: ', IFNULL(par2.modelo_veiculo, ''), ' \n',
+                    'Chassi: ', IFNULL(par2.chassi, ''), ' \n',
+                    'Cor: ', IFNULL(par2.cor, ''), ' \n\n',
+                    'Terceiros: ', IFNULL(
+                        (
+                            SELECT GROUP_CONCAT(CONCAT(par3.nome, ' | ', par3.placa) SEPARATOR ' \n')
+                            FROM hbrd_adm_sinister_participant par3
+                            WHERE par3.associado = 0
+                              AND par3.id_sinister = par.id_sinister
+                        ), ''
+                    )
+                )
+            FROM hbrd_adm_sinister_participant par2
+            WHERE par2.associado = 1
+              AND par2.id_sinister = par.id_sinister
+            LIMIT 1
         )
-END `description`,
-CONCAT(IFNULL(hmuc.cidade, ''), ' - ', IFNULL(hmus.estado, '')) address,
-DATE_FORMAT(status.create_at, '%Y-%m-%dT%H:%i:%s') task_date
+    END AS `description`,
+    CONCAT(IFNULL(hmuc.cidade, ''), ' - ', IFNULL(hmus.estado, '')) AS address,
+    DATE_FORMAT(status.create_at, '%Y-%m-%dT%H:%i:%s') AS task_date
 FROM hbrd_adm_sinister_participant_status_history status
 LEFT JOIN hbrd_adm_sinister_participant_type_history tipe ON status.id_pai = tipe.id
 LEFT JOIN hbrd_adm_sinister_status s ON status.id_status = s.id
@@ -346,7 +380,6 @@ LEFT JOIN hbrd_adm_sinister_order haso ON haso.id_participant = par.id
 LEFT JOIN hbrd_adm_sinister has ON has.id = par.id_sinister
 LEFT JOIN hbrd_main_util_city hmuc ON hmuc.id = par.id_cidade
 LEFT JOIN hbrd_main_util_state hmus ON hmuc.id_estado = hmus.id
-
 WHERE status.id_status = 16
   AND par.status = 'Ativo'
   AND COALESCE(
@@ -358,8 +391,7 @@ WHERE status.id_status = 16
         ),
         status.leave_at
     ) IS NULL
-   AND DATE(status.create_at) >= '2025-03-28'
-
+	AND DATE(status.create_at) >= '2025-03-28'
 GROUP BY tipe.id_participant;
     ")
             );
@@ -375,7 +407,7 @@ GROUP BY tipe.id_participant;
             ->select(
                 "SELECT par.id AS external_id,
 CONCAT(par.id, 'W', WEEKOFYEAR(CURDATE()), 'Y', YEAR(CURDATE())) AS task_external_id,
-CONCAT(par.id, ' / ', par.nome, ' / ', par.placa, ' / ', IFNULL(state.uf, '')) AS `name`,
+CONCAT(par.id, ' / ', par.nome, ' / ', par.placa, ' / ', IFNULL(state.uf, ''), ' / ', par.telefone) AS `name`,
 tipe.id_participant,
     par.cpf_cnpj AS cpfCnpj,
     has.id AS workshop_id,
@@ -396,6 +428,7 @@ LEFT JOIN hbrd_main_util_state state ON state.id = par.id_estado
 LEFT JOIN hbrd_main_user hmu ON hmu.id = par.id_colaborador
 WHERE tipe.id_tipo IN (8, 14)
 AND status.id_status = 6
+AND status.create_at > CURDATE() - INTERVAL 45 DAY
 AND hmu.nome IS NOT NULL
 AND par.status = 'Ativo'
 AND COALESCE(
@@ -411,6 +444,109 @@ GROUP BY tipe.id_participant;"
             ));
     }
 
+
+    public static function getAccidentInvolvedWorkshopOutForAuvoAssociateSuccessInSolidy(): Collection
+    {
+
+        return collect(DB::connection('ileva')
+            ->select(
+                "SELECT 
+    par.id AS external_id,
+    CONCAT(par.id, 'W', WEEKOFYEAR(CURDATE()), 'Y', YEAR(CURDATE())) AS task_external_id,
+    CONCAT(par.id, ' / ', par.nome, ' / ', par.placa, ' / ', IFNULL(state.uf, ''), ' / ', par.telefone) AS name,
+    tipe.id_participant,
+    par.cpf_cnpj AS cpfCnpj,
+    has.id AS workshop_id,
+    CONCAT(IFNULL(has.nome, ''), ' / ', IFNULL(has.endereco, ''), ' / ', IFNULL(city.cidade, '')) AS address,
+    CONCAT(IFNULL(has.nome, ''), ' / Placa: ', IFNULL(par.placa, ''), ' / Veículo: ', IFNULL(par.modelo_veiculo, '')) AS orientation,
+    par.telefone AS phone,
+    par.email,
+    state.uf,
+    UPPER(hmu.nome) colaborator_name,
+    status.leave_at,
+    haso.dt_entrega AS dt_prevista,
+    store.status,
+    haso.dt_entrega AS dt_ebtrega_par,
+    store.dt_entrega AS dt_entrega_forn,
+    -- Nova coluna entrega conforme regra solicitada
+    CASE 
+        WHEN haso.status = 'Aprovada' 
+             AND store.dt_entrega <= haso.dt_entrega THEN 'Entregue no prazo'
+        ELSE NULL
+    END AS entrega
+FROM hbrd_adm_sinister_participant_status_history status
+LEFT JOIN hbrd_adm_sinister_participant_type_history tipe ON status.id_pai = tipe.id
+LEFT JOIN hbrd_adm_sinister_participant par ON par.id = tipe.id_participant
+LEFT JOIN hbrd_adm_sinister_history sh ON sh.id_sinister = par.id_sinister
+LEFT JOIN hbrd_adm_sinister_order haso ON haso.id_participant = par.id
+LEFT JOIN hbrd_adm_sinister_order_store store ON store.id_order = haso.id
+LEFT JOIN hbrd_adm_sinister_order_regulation_type hsor ON hsor.id = haso.id_tipo
+LEFT JOIN hbrd_adm_store has ON has.id = haso.id_store
+LEFT JOIN hbrd_main_util_city city ON city.id = par.id_cidade
+LEFT JOIN hbrd_main_util_state state ON state.id = par.id_estado
+LEFT JOIN hbrd_main_user hmu ON hmu.id = par.id_colaborador
+WHERE tipe.id_tipo IN (8, 14)
+  AND hsor.id = 1
+  AND store.status = 'Entregue'
+  AND haso.status = 'Aprovada'
+  AND store.dt_entrega <= haso.dt_entrega
+  AND store.dt_entrega = DATE_SUB(CURDATE(), INTERVAL 90 DAY)
+GROUP BY tipe.id_participant;"
+            ));
+    }
+
+
+    public static function getAccidentInvolvedWorkshopOutLateForAuvoAssociateSuccessInSolidy(): Collection
+    {
+
+        return collect(DB::connection('ileva')
+            ->select(
+                "SELECT 
+    par.id AS external_id,
+    CONCAT(par.id, 'W', WEEKOFYEAR(CURDATE()), 'Y', YEAR(CURDATE())) AS task_external_id,
+    CONCAT(par.id, ' / ', par.nome, ' / ', par.placa, ' / ', IFNULL(state.uf, ''), ' / ', par.telefone) AS name,
+    tipe.id_participant,
+    par.cpf_cnpj AS cpfCnpj,
+    has.id AS workshop_id,
+    CONCAT(IFNULL(has.nome, ''), ' / ', IFNULL(has.endereco, ''), ' / ', IFNULL(city.cidade, '')) AS address,
+    CONCAT(IFNULL(has.nome, ''), ' / Placa: ', IFNULL(par.placa, ''), ' / Veículo: ', IFNULL(par.modelo_veiculo, '')) AS orientation,
+    par.telefone AS phone,
+    par.email,
+    state.uf,
+    UPPER(hmu.nome) colaborator_name,
+    status.leave_at,
+    haso.dt_entrega AS dt_prevista,
+    store.status,
+    haso.dt_entrega AS dt_ebtrega_par,
+    store.dt_entrega AS dt_entrega_forn,
+    -- Nova coluna entrega conforme regra solicitada
+    CASE 
+        WHEN haso.status = 'Aprovada' 
+             AND store.dt_entrega > haso.dt_entrega THEN 'Entregue com Atraso'
+        ELSE NULL
+    END AS entrega
+FROM hbrd_adm_sinister_participant_status_history status
+LEFT JOIN hbrd_adm_sinister_participant_type_history tipe ON status.id_pai = tipe.id
+LEFT JOIN hbrd_adm_sinister_participant par ON par.id = tipe.id_participant
+LEFT JOIN hbrd_adm_sinister_history sh ON sh.id_sinister = par.id_sinister
+LEFT JOIN hbrd_adm_sinister_order haso ON haso.id_participant = par.id
+LEFT JOIN hbrd_adm_sinister_order_store store ON store.id_order = haso.id
+LEFT JOIN hbrd_adm_sinister_order_regulation_type hsor ON hsor.id = haso.id_tipo
+LEFT JOIN hbrd_adm_store has ON has.id = haso.id_store
+LEFT JOIN hbrd_main_util_city city ON city.id = par.id_cidade
+LEFT JOIN hbrd_main_util_state state ON state.id = par.id_estado
+LEFT JOIN hbrd_main_user hmu ON hmu.id = par.id_colaborador
+WHERE tipe.id_tipo IN (8, 14)
+  AND hsor.id = 1
+  AND haso.status = 'Aprovada'
+  AND store.dt_entrega > haso.dt_entrega
+  AND store.dt_entrega = DATE_SUB(CURDATE(), INTERVAL 90 DAY)
+GROUP BY tipe.id_participant;"
+            ));
+    }
+
+
+
     public static function getAccidentInvolvedForAuvoAssociateSuccessInMotoclub(): Collection
     {
 
@@ -418,7 +554,7 @@ GROUP BY tipe.id_participant;"
             ->select(
                 "SELECT CONCAT('mc', par.id) AS external_id,
 CONCAT('mc', par.id, 'W', WEEKOFYEAR(CURDATE()), 'Y', YEAR(CURDATE())) AS task_external_id,
-CONCAT('mc', par.id, ' / ', par.nome, ' / ', par.placa, ' / ', IFNULL(state.uf, '')) AS `name`,
+CONCAT('mc', par.id, ' / ', par.nome, ' / ', par.placa, ' / ', IFNULL(state.uf, ''), ' / ', par.telefone) AS `name`,
 tipe.id_participant,
 par.cpf_cnpj AS cpfCnpj,
 CONCAT(IFNULL(has.nome, ''), ' / ', IFNULL(has.endereco, ''), ' / ', IFNULL(city.cidade, '')) AS address,
@@ -438,6 +574,7 @@ LEFT JOIN hbrd_main_util_state state ON state.id = par.id_estado
 LEFT JOIN hbrd_main_user hmu ON hmu.id = par.id_colaborador
 WHERE tipe.id_tipo IN (8)
 AND status.id_status = 6
+
 AND hmu.nome IS NOT NULL
 AND par.status = 'Ativo'
 AND COALESCE(
@@ -449,7 +586,102 @@ AND COALESCE(
    ),
    status.leave_at
 ) IS NULL
+    GROUP BY tipe.id_participant;"
+            ));
+    }
+    
+
+    public static function getAccidentInvolvedWorkshopOutForAuvoAssociateSuccessInMotoclub(): Collection
+    {
+
+        return collect(DB::connection('ileva_motoclub')
+            ->select(
+                "SELECT CONCAT('mc', par.id) AS external_id,
+CONCAT('mc', par.id, 'W', WEEKOFYEAR(CURDATE()), 'Y', YEAR(CURDATE())) AS task_external_id,
+CONCAT('mc', par.id, ' / ', par.nome, ' / ', par.placa, ' / ', IFNULL(state.uf, ''), ' / ', par.telefone) AS `name`,
+tipe.id_participant,
+par.cpf_cnpj AS cpfCnpj,
+CONCAT(IFNULL(has.nome, ''), ' / ', IFNULL(has.endereco, ''), ' / ', IFNULL(city.cidade, '')) AS address,
+CONCAT(IFNULL(has.nome, ''), ' / Placa: ', IFNULL(par.placa, ''), ' / Veículo: ', IFNULL(par.modelo_veiculo, '')) AS orientation,
+par.telefone AS phone,
+par.email,
+state.uf,
+UPPER(hmu.nome) colaborator_name,
+ haso.dt_entrega AS dt_ebtrega_par,
+    store.dt_entrega AS dt_entrega_forn,
+    -- Nova coluna entrega conforme regra solicitada
+      CASE 
+        WHEN haso.status = 'Aprovada' 
+             AND store.dt_entrega <= haso.dt_entrega THEN 'Entregue no prazo'
+        ELSE NULL
+    END AS entrega
+FROM hbrd_adm_sinister_participant_status_history status
+LEFT JOIN hbrd_adm_sinister_participant_type_history tipe ON status.id_pai = tipe.id
+LEFT JOIN hbrd_adm_sinister_participant par ON par.id = tipe.id_participant
+LEFT JOIN hbrd_adm_sinister_history sh ON sh.id_sinister = par.id_sinister
+LEFT JOIN hbrd_adm_sinister_order haso ON haso.id_participant = par.id
+LEFT JOIN hbrd_adm_sinister_order_store store ON store.id_order = haso.id
+LEFT JOIN hbrd_adm_store has ON has.id = haso.id_store
+LEFT JOIN hbrd_main_util_city city ON city.id = par.id_cidade
+LEFT JOIN hbrd_main_util_state state ON state.id = par.id_estado
+LEFT JOIN hbrd_main_user hmu ON hmu.id = par.id_colaborador
+WHERE tipe.id_tipo IN (8)
+AND status.id_status = 6
+AND hmu.nome IS NOT NULL
+AND par.status = 'Ativo'
+AND store.status = 'Entregue'
+  AND haso.status = 'Aprovada'
+  AND store.dt_entrega <= haso.dt_entrega
+  AND store.dt_entrega = DATE_SUB(CURDATE(), INTERVAL 90 DAY)
+GROUP BY tipe.id_participant;"
+            ));
+    }
+
+
+    public static function getAccidentInvolvedWorkshopOutLateForAuvoAssociateSuccessInMotoclub(): Collection
+    {
+
+        return collect(DB::connection('ileva_motoclub')
+            ->select(
+                "SELECT CONCAT('mc', par.id) AS external_id,
+CONCAT('mc', par.id, 'W', WEEKOFYEAR(CURDATE()), 'Y', YEAR(CURDATE())) AS task_external_id,
+CONCAT('mc', par.id, ' / ', par.nome, ' / ', par.placa, ' / ', IFNULL(state.uf, ''), ' / ', par.telefone) AS `name`,
+tipe.id_participant,
+par.cpf_cnpj AS cpfCnpj,
+CONCAT(IFNULL(has.nome, ''), ' / ', IFNULL(has.endereco, ''), ' / ', IFNULL(city.cidade, '')) AS address,
+CONCAT(IFNULL(has.nome, ''), ' / Placa: ', IFNULL(par.placa, ''), ' / Veículo: ', IFNULL(par.modelo_veiculo, '')) AS orientation,
+par.telefone AS phone,
+par.email,
+state.uf,
+UPPER(hmu.nome) colaborator_name,
+ haso.dt_entrega AS dt_ebtrega_par,
+    store.dt_entrega AS dt_entrega_forn,
+    -- Nova coluna entrega conforme regra solicitada
+       CASE 
+        WHEN haso.status = 'Aprovada' 
+             AND store.dt_entrega > haso.dt_entrega THEN 'Entregue com Atraso'
+        ELSE NULL
+    END AS entrega
+FROM hbrd_adm_sinister_participant_status_history status
+LEFT JOIN hbrd_adm_sinister_participant_type_history tipe ON status.id_pai = tipe.id
+LEFT JOIN hbrd_adm_sinister_participant par ON par.id = tipe.id_participant
+LEFT JOIN hbrd_adm_sinister_history sh ON sh.id_sinister = par.id_sinister
+LEFT JOIN hbrd_adm_sinister_order haso ON haso.id_participant = par.id
+LEFT JOIN hbrd_adm_sinister_order_store store ON store.id_order = haso.id
+LEFT JOIN hbrd_adm_store has ON has.id = haso.id_store
+LEFT JOIN hbrd_main_util_city city ON city.id = par.id_cidade
+LEFT JOIN hbrd_main_util_state state ON state.id = par.id_estado
+LEFT JOIN hbrd_main_user hmu ON hmu.id = par.id_colaborador
+WHERE tipe.id_tipo IN (8)
+AND status.id_status = 6
+AND hmu.nome IS NOT NULL
+AND par.status = 'Ativo'
+AND haso.status = 'Aprovada'
+  AND store.dt_entrega > haso.dt_entrega
+  AND store.dt_entrega = DATE_SUB(CURDATE(), INTERVAL 90 DAY)
 GROUP BY tipe.id_participant;"
             ));
     }
 }
+
+

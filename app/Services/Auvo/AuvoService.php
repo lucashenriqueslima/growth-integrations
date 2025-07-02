@@ -64,7 +64,11 @@ class AuvoService
         return Octane::concurrently(
             [
                 fn() => IlevaAccidentInvolved::getAccidentInvolvedForAuvoAssociateSuccessInSolidy(),
+                //fn() => IlevaAccidentInvolved::getAccidentInvolvedWorkshopOutForAuvoAssociateSuccessInSolidy(),
+                //fn() => IlevaAccidentInvolved::getAccidentInvolvedWorkshopOutLateForAuvoAssociateSuccessInSolidy(),
                 fn() => IlevaAccidentInvolved::getAccidentInvolvedForAuvoAssociateSuccessInMotoclub(),
+                //fn() => IlevaAccidentInvolved::getAccidentInvolvedWorkshopOutForAuvoAssociateSuccessInMotoclub(),
+                //fn() => IlevaAccidentInvolved::getAccidentInvolvedWorkshopOutLateForAuvoAssociateSuccessInMotoclub(),
             ],
             50000
         );
